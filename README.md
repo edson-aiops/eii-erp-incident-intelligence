@@ -1,12 +1,12 @@
 ---
 title: EII — ERP Incident Intelligence
 emoji: ⚙️
-colorFrom: orange
+colorFrom: red
 colorTo: red
 sdk: docker
 pinned: true
 license: mit
-short_description: Diagnóstico inteligente de falhas de integração eSocial com CRAG + Human-in-the-Loop
+short_description: Diagnóstico eSocial XML com CRAG + Human-in-the-Loop
 ---
 
 # ⚙️ EII — ERP Incident Intelligence

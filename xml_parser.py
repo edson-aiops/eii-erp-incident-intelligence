@@ -10,6 +10,43 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# PII scrubbing — CPF, CNPJ, NIS/PIS
+# Order matters: CNPJ (14 digits) before CPF/NIS (11 digits)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_RE_CNPJ_FMT = re.compile(r'\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b')
+_RE_CNPJ_RAW = re.compile(r'\b\d{14}\b')
+_RE_NIS_FMT  = re.compile(r'\b\d{3}\.\d{5}\.\d{2}-\d{1}\b')
+_RE_CPF_FMT  = re.compile(r'\b\d{3}\.\d{3}\.\d{3}-\d{2}\b')
+_RE_CPF_RAW  = re.compile(r'\b\d{11}\b')
+
+
+def scrub_pii(text: str) -> str:
+    """Mask CPF, CNPJ and NIS/PIS before LLM prompts and persistence."""
+    if not text:
+        return text
+
+    def _mask(m: re.Match, label: str, keep: int) -> str:
+        digits = re.sub(r'\D', '', m.group())
+        return f'[{label}/****{digits[-keep:]}]'
+
+    text = _RE_CNPJ_FMT.sub(lambda m: _mask(m, 'CNPJ', 2), text)
+    text = _RE_CNPJ_RAW.sub(lambda m: _mask(m, 'CNPJ', 2), text)
+    text = _RE_NIS_FMT.sub( lambda m: _mask(m, 'NIS',  1), text)
+    text = _RE_CPF_FMT.sub( lambda m: _mask(m, 'CPF',  2), text)
+    text = _RE_CPF_RAW.sub( lambda m: _mask(m, 'CPF',  2), text)
+    return text
+
+
+def _scrub_parsed(p: "ParsedXML") -> "ParsedXML":
+    p.nr_inscricao = scrub_pii(p.nr_inscricao)
+    for oc in p.ocorrencias:
+        oc.descricao   = scrub_pii(oc.descricao)
+        oc.localizacao = scrub_pii(oc.localizacao)
+    return p
+
+
 @dataclass
 class Ocorrencia:
     tipo: str        # ERROR, AVISO, INFO
@@ -188,7 +225,7 @@ def parse_esocial_xml(xml_content: str) -> ParsedXML:
             result.ocorrencias += _extract_ocorrencias(ret_evt)
             if not result.nr_recibo:
                 result.nr_recibo = _text(ret_evt, "nrRec")
-        return result
+        return _scrub_parsed(result)
 
     # ── Formato 2: retornoProcessamentoEvento ────────────────────────────
     proc_ret = next((c for c in root.iter()
@@ -200,7 +237,7 @@ def parse_esocial_xml(xml_content: str) -> ParsedXML:
         result.nr_recibo     = _text(proc_ret, "nrRec")
         result.ocorrencias   = _extract_ocorrencias(proc_ret)
         result.nr_inscricao  = _text(root, "nrInsc")
-        return result
+        return _scrub_parsed(result)
 
     # ── Formato 3: retornoEvento simples ─────────────────────────────────
     ret_evt = next((c for c in root.iter() if _tag(c) == "retornoEvento"), None)
@@ -211,7 +248,7 @@ def parse_esocial_xml(xml_content: str) -> ParsedXML:
         result.nr_recibo     = _text(ret_evt, "nrRec")
         result.ocorrencias   = _extract_ocorrencias(ret_evt)
         result.nr_inscricao  = _text(root, "nrInsc")
-        return result
+        return _scrub_parsed(result)
 
     # ── Formato 4: Qualquer XML com ocorrencias ───────────────────────────
     result.formato = "generico"
@@ -221,7 +258,7 @@ def parse_esocial_xml(xml_content: str) -> ParsedXML:
     result.nr_inscricao  = _text(root, "nrInsc")
     result.competencia   = _text(root, "indApuracao") or _text(root, "perApur")
     result.ocorrencias   = _extract_ocorrencias(root)
-    return result
+    return _scrub_parsed(result)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

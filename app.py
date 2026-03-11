@@ -5,6 +5,8 @@ eSocial XML Diagnostic System with CRAG + Human-in-the-Loop
 
 import gradio as gr
 import json
+import os
+import sqlite3
 from datetime import datetime
 from xml_parser import parse_esocial_xml, SAMPLE_XMLS
 from crag_pipeline import build_vector_store, run_crag
@@ -15,8 +17,77 @@ from crag_pipeline import build_vector_store, run_crag
 
 COLLECTION = build_vector_store()
 
-PENDING   = {}   # incident_id → {parsed, diagnosis, ...}
-AUDIT_LOG = []   # list of finalized entries
+# ─────────────────────────────────────────────────────────────────────────────
+# Persistence — SQLite
+# DB_PATH: set to /data/eii_incidents.db in HuggingFace Spaces (persistent vol)
+# ─────────────────────────────────────────────────────────────────────────────
+
+DB_PATH = os.environ.get("DB_PATH", "eii_incidents.db")
+
+
+def _db_conn() -> sqlite3.Connection:
+    return sqlite3.connect(DB_PATH)
+
+
+def _db_init() -> None:
+    with _db_conn() as con:
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS incidents (
+                id             TEXT PRIMARY KEY,
+                created_at     TEXT NOT NULL,
+                diagnosis_json TEXT NOT NULL,
+                status         TEXT NOT NULL DEFAULT 'PENDING',
+                notes          TEXT,
+                decided_at     TEXT
+            )
+        """)
+
+
+_db_init()
+
+
+def _db_save_pending(inc_id: str, diagnosis: dict, timestamp: str) -> None:
+    with _db_conn() as con:
+        con.execute(
+            "INSERT INTO incidents (id, created_at, diagnosis_json, status) VALUES (?, ?, ?, 'PENDING')",
+            (inc_id, timestamp, json.dumps(diagnosis, ensure_ascii=False)),
+        )
+
+
+def _db_fetch_pending(inc_id: str) -> dict | None:
+    with _db_conn() as con:
+        row = con.execute(
+            "SELECT diagnosis_json FROM incidents WHERE id=? AND status='PENDING'",
+            (inc_id,),
+        ).fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def _db_decide(inc_id: str, status: str, notes: str) -> None:
+    with _db_conn() as con:
+        con.execute(
+            "UPDATE incidents SET status=?, notes=?, decided_at=? WHERE id=?",
+            (status, notes, datetime.now().isoformat(), inc_id),
+        )
+
+
+def _db_audit_log(limit: int = 20) -> list:
+    with _db_conn() as con:
+        rows = con.execute(
+            "SELECT id, created_at, diagnosis_json, status, notes, decided_at "
+            "FROM incidents WHERE status != 'PENDING' ORDER BY decided_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [
+        {
+            "diagnosis": json.loads(r[2]),
+            "status":    r[3],
+            "notes":     r[4] or "—",
+            "decided_at": r[5] or "",
+        }
+        for r in rows
+    ]
+
 
 SEV = {
     "CRÍTICO": ("🔴", "#ff4444"),
@@ -65,11 +136,7 @@ def analyze_xml(xml_input: str):
 
     diagnosis = run_crag(COLLECTION, parsed, inc_id)
 
-    PENDING[inc_id] = {
-        "parsed": parsed,
-        "diagnosis": diagnosis,
-        "timestamp": datetime.now().isoformat(),
-    }
+    _db_save_pending(inc_id, diagnosis, datetime.now().isoformat())
 
     diag_md  = render_diagnosis(diagnosis, parsed)
     parse_md = render_parsed_xml(parsed)
@@ -92,24 +159,16 @@ def reject_incident(inc_id: str, notes: str):
 
 
 def _decide(inc_id: str, notes: str, status: str):
-    if not inc_id or inc_id not in PENDING:
+    dx = _db_fetch_pending(inc_id) if inc_id else None
+    if dx is None:
         return (
             "❌ ID não encontrado nos incidentes pendentes. Analise um XML primeiro.",
             render_audit_log(),
         )
 
-    entry = PENDING.pop(inc_id)
-    dx    = entry["diagnosis"]
+    _db_decide(inc_id, status, notes or "—")
 
-    icon = "✅" if status == "APROVADO" else "❌"
-    record = {
-        **entry,
-        "status": status,
-        "notes": notes or "—",
-        "decided_at": datetime.now().isoformat(),
-    }
-    AUDIT_LOG.append(record)
-
+    icon     = "✅" if status == "APROVADO" else "❌"
     sev_icon = SEV.get(dx.get("severidade", "MÉDIO"), ("⚪", "#888"))[0]
 
     result_md = f"""## {icon} Decisão Registrada
@@ -133,11 +192,12 @@ def _decide(inc_id: str, notes: str, status: str):
 
 
 def render_audit_log() -> str:
-    if not AUDIT_LOG:
+    entries = _db_audit_log(20)
+    if not entries:
         return "*Nenhuma resolução registrada ainda.*"
 
-    md = f"## 📋 Log de Auditoria — {len(AUDIT_LOG)} registro(s)\n\n"
-    for entry in reversed(AUDIT_LOG[-20:]):
+    md = f"## 📋 Log de Auditoria — {len(entries)} registro(s) (últimos 20)\n\n"
+    for entry in entries:
         dx      = entry["diagnosis"]
         status  = entry["status"]
         icon    = "✅" if status == "APROVADO" else "❌"
@@ -149,7 +209,8 @@ def render_audit_log() -> str:
             f"**Evento:** {dx.get('evento', '—')} &nbsp;|&nbsp; "
             f"**Erro:** `{dx.get('codigo_erro', '—')}` &nbsp;|&nbsp; "
             f"**Severidade:** {sev_icon} {dx.get('severidade', '—')}\n\n"
-            f"**Confiança:** {CONF.get(dx.get('confianca','BAIXA'),'—')} &nbsp;|&nbsp; "
+            f"**Confiança:** {CONF.get(dx.get('confianca','BAIXA'),'—')} "
+            f"*(P={meta.get('logprob_sim', '—')})* &nbsp;|&nbsp; "
             f"**Fonte:** `{dx.get('fonte','—')}` &nbsp;|&nbsp; "
             f"**Docs KB:** {meta.get('candidates_relevant', 0)}/{meta.get('candidates_retrieved', 0)}\n\n"
             f"**Causa:** {dx.get('causa_raiz', '—')[:200]}...\n\n"

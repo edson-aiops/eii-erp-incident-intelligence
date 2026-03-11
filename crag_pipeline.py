@@ -7,9 +7,11 @@ import chromadb
 from chromadb.utils import embedding_functions
 import requests
 import json
+import math
 import re
 import os
 from knowledge_base import KB
+from xml_parser import scrub_pii
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -36,7 +38,7 @@ def build_vector_store() -> chromadb.Collection:
             f"Causa Raiz: {item['causa_raiz']}\n"
             f"Tags: {', '.join(item['tags'])}"
         )
-        docs.append(doc)
+        docs.append(scrub_pii(doc))
         ids.append(item["id"])
         metas.append({
             "evento": item["evento"],
@@ -49,16 +51,27 @@ def build_vector_store() -> chromadb.Collection:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Model routing
+# ROUTER  → small/fast model for deterministic binary steps (grade)
+# GENERATOR → large model for complex JSON generation
+# ─────────────────────────────────────────────────────────────────────────────
+
+MODEL_ROUTER    = os.environ.get("EII_MODEL_ROUTER",    "llama-3.1-8b-instant")
+MODEL_GENERATOR = os.environ.get("EII_MODEL_GENERATOR", "llama-3.3-70b-versatile")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # LLM — Groq
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _groq(messages: list, system: str = "", max_tokens: int = 800) -> str:
+def _groq(messages: list, system: str = "", max_tokens: int = 800,
+          model: str = MODEL_GENERATOR) -> str:
     api_key = os.environ.get("GROQ_API_KEY", "")
     if not api_key:
         return "❌ GROQ_API_KEY não configurada. Adicione nas Secrets do HuggingFace Space."
 
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": model,
         "messages": ([{"role": "system", "content": system}] if system else []) + messages,
         "max_tokens": max_tokens,
         "temperature": 0.05,
@@ -74,6 +87,84 @@ def _groq(messages: list, system: str = "", max_tokens: int = 800) -> str:
         return f"❌ Groq {r.status_code}: {r.text[:300]}"
     except Exception as e:
         return f"❌ Conexão Groq: {e}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADR-001 — Logprobs confidence gate
+# Calls Groq with logprobs=True, max_tokens=1.
+# Measures P(SIM) over top-5 candidate tokens to score diagnosis confidence.
+# Thresholds: ≥0.80 → ALTA | ≥0.55 → MÉDIA | <0.55 → BAIXA
+# ─────────────────────────────────────────────────────────────────────────────
+
+_AFFIRMATIVE = {"SIM", "S", "YES", "Y"}
+_CONF_THRESHOLDS = [(0.80, "ALTA"), (0.45, "MÉDIA")]
+
+
+def _prob_to_label(prob: float) -> str:
+    for threshold, label in _CONF_THRESHOLDS:
+        if prob >= threshold:
+            return label
+    return "BAIXA"
+
+
+def _groq_logprobs(messages: list) -> float:
+    """Returns P(affirmative) ∈ [0,1] from top-5 logprobs. Falls back to 0.5."""
+    api_key = os.environ.get("GROQ_API_KEY", "")
+    if not api_key:
+        return 0.5
+
+    payload = {
+        "model": MODEL_ROUTER,
+        "messages": messages,
+        "max_tokens": 1,
+        "temperature": 0.0,
+        "logprobs": True,
+        "top_logprobs": 5,
+    }
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json=payload, timeout=20,
+        )
+        if r.status_code != 200:
+            return 0.5
+        content_lp = r.json()["choices"][0].get("logprobs", {}).get("content", [])
+        if not content_lp:
+            return 0.5
+        prob = sum(
+            math.exp(e["logprob"])
+            for e in content_lp[0].get("top_logprobs", [])
+            if e["token"].strip().upper() in _AFFIRMATIVE
+        )
+        return min(prob, 1.0)
+    except Exception:
+        return 0.5
+
+
+def confidence_score(parsed_xml, diagnosis: dict) -> tuple:
+    """
+    Binary confidence gate (ADR-001).
+    Asks MODEL_ROUTER to confirm the diagnosis; measures P(SIM) via logprobs.
+    Returns (label: str, prob_sim: float).
+    """
+    ocorrencias_txt = "; ".join([
+        f"[{o.codigo}] {o.descricao[:80]}"
+        for o in parsed_xml.ocorrencias[:3]
+    ]) or parsed_xml.cd_resposta
+
+    prompt = (
+        f"Incidente eSocial — Evento: {parsed_xml.tipo_evento or '?'} | "
+        f"cdResposta: {parsed_xml.cd_resposta}\n"
+        f"Ocorrências: {ocorrencias_txt}\n\n"
+        f"Diagnóstico gerado:\n"
+        f"Causa: {diagnosis.get('causa_raiz', '')[:300]}\n"
+        f"Código erro: {diagnosis.get('codigo_erro', '')}\n\n"
+        "O diagnóstico está tecnicamente correto para este incidente eSocial? "
+        "Responda apenas: SIM ou NÃO"
+    )
+    prob_sim = _groq_logprobs([{"role": "user", "content": prompt}])
+    return _prob_to_label(prob_sim), prob_sim
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -113,7 +204,8 @@ def grade(query: str, candidates: list) -> list:
         )
         verdict = _groq(
             [{"role": "user", "content": prompt}],
-            max_tokens=5
+            max_tokens=5,
+            model=MODEL_ROUTER,
         ).strip().upper()
         if "RELEVANTE" in verdict:
             relevant.append(c)
@@ -228,9 +320,14 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str) -> dict:
     relevant   = grade(query, candidates)
     diagnosis  = generate(parsed_xml, relevant, incident_id)
 
+    # ADR-001: override LLM-generated confianca with calibrated logprob score
+    confianca, prob_sim = confidence_score(parsed_xml, diagnosis)
+    diagnosis["confianca"] = confianca
+
     diagnosis["_meta"] = {
         "candidates_retrieved": len(candidates),
         "candidates_relevant": len(relevant),
         "query_used": query[:200],
+        "logprob_sim": round(prob_sim, 3),
     }
     return diagnosis

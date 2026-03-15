@@ -568,6 +568,238 @@ class TestLogprobs(unittest.TestCase):
                 self.assertIn(field, meta)
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# 6. EvaluatorAgent
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TestEvaluatorAgent(unittest.TestCase):
+
+    # ── shared fixtures ───────────────────────────────────────────────────────
+
+    _ALL  = list(crag_pipeline._EVAL_CRITERIA)  # all 5 criterion names
+    _HARD = sorted(crag_pipeline._EVAL_HARD_GATES)
+    _SOFT = ["kb_grounding", "severity_calibration"]
+
+    def _mock_parsed(self):
+        p = MagicMock()
+        p.tipo_evento   = "S-1200"
+        p.cd_resposta   = "401"
+        p.desc_resposta = "Rejeitado"
+        p.nr_inscricao  = "[CNPJ/****95]"
+        p.ocorrencias   = []
+        p.error_codes   = ["E428"]
+        return p
+
+    def _dx(self):
+        return {
+            "incident_id":       "INC-EVA",
+            "evento":            "S-1200",
+            "codigo_erro":       "E428",
+            "severidade":        "ALTO",
+            "causa_raiz":        "indRetif incorreto",
+            "confianca":         "ALTA",
+            "fonte":             "KB_MATCH",
+            "passos_resolucao":  ["passo 1 detalhado", "passo 2 detalhado"],
+            "validacao":         "verificar reprocessamento",
+            "tempo_estimado":    "1h",
+            "referencias_kb":    ["KB001"],
+            "alerta_hitl":       "revisar antes de executar",
+        }
+
+    def _eval_json(self, passed, failed, critique="", hint=""):
+        return json.dumps({
+            "criteria_passed":    passed,
+            "criteria_failed":    failed,
+            "critique":           critique,
+            "regeneration_hint":  hint,
+        })
+
+    def _approved_eval_result(self):
+        return {
+            "verdict":           "APPROVED",
+            "criteria_passed":   self._ALL,
+            "criteria_failed":   [],
+            "critique":          "",
+            "should_regenerate": False,
+            "regeneration_hint": "",
+        }
+
+    def _rejected_eval_result(self, should_regenerate=True):
+        return {
+            "verdict":           "REJECTED",
+            "criteria_passed":   self._SOFT,
+            "criteria_failed":   self._HARD,
+            "critique":          "Hard gates falharam.",
+            "should_regenerate": should_regenerate,
+            "regeneration_hint": "Corrija a causa_raiz.",
+        }
+
+    def _run_crag_mocks(self, eval_side_effects, generate_return=None):
+        """Returns a context manager tuple for patching all run_crag dependencies."""
+        if generate_return is None:
+            generate_return = self._dx()
+        return (
+            patch("crag_pipeline.retrieve",          return_value=[]),
+            patch("crag_pipeline.grade",             return_value=[]),
+            patch("crag_pipeline.generate",          return_value=generate_return),
+            patch("crag_pipeline.evaluate_diagnosis", side_effect=eval_side_effects),
+            patch("crag_pipeline.confidence_score",  return_value=("ALTA", 0.92)),
+        )
+
+    # ── 1–3: _eval_verdict ───────────────────────────────────────────────────
+
+    def test_eval_verdict_all_pass_approved(self):
+        """All 5 criteria passing → APPROVED."""
+        self.assertEqual(crag_pipeline._eval_verdict(self._ALL), "APPROVED")
+
+    def test_eval_verdict_hard_gate_missing_rejected(self):
+        """Missing one hard gate → REJECTED regardless of other criteria."""
+        # drop causal_coherence (a hard gate)
+        without_hard = [c for c in self._ALL if c != "causal_coherence"]
+        self.assertEqual(crag_pipeline._eval_verdict(without_hard), "REJECTED")
+
+    def test_eval_verdict_all_hard_no_soft_rejected(self):
+        """All 3 hard gates present but zero soft criteria → REJECTED."""
+        self.assertEqual(crag_pipeline._eval_verdict(self._HARD), "REJECTED")
+
+    # ── 4–5: evaluate_diagnosis happy path ───────────────────────────────────
+
+    def test_evaluate_diagnosis_approved_valid_json(self):
+        """LLM returns JSON with all criteria passing → APPROVED."""
+        with patch("crag_pipeline._groq",
+                   return_value=self._eval_json(self._ALL, [])):
+            result = crag_pipeline.evaluate_diagnosis(
+                self._mock_parsed(), self._dx(), [], iteration=0
+            )
+        self.assertEqual(result["verdict"], "APPROVED")
+        self.assertEqual(set(result["criteria_passed"]), set(self._ALL))
+        self.assertEqual(result["criteria_failed"], [])
+        self.assertFalse(result["should_regenerate"])
+
+    def test_evaluate_diagnosis_rejected_hard_gate_fails(self):
+        """LLM returns JSON with a hard gate in criteria_failed → REJECTED."""
+        with patch("crag_pipeline._groq",
+                   return_value=self._eval_json(
+                       self._SOFT,
+                       self._HARD,
+                       critique="causal_coherence falhou",
+                       hint="Corrija causa_raiz.",
+                   )):
+            result = crag_pipeline.evaluate_diagnosis(
+                self._mock_parsed(), self._dx(), [], iteration=0
+            )
+        self.assertEqual(result["verdict"], "REJECTED")
+        self.assertIn("causal_coherence", result["criteria_failed"])
+        self.assertEqual(result["critique"], "causal_coherence falhou")
+        self.assertEqual(result["regeneration_hint"], "Corrija causa_raiz.")
+
+    # ── 6–7: should_regenerate boundary ──────────────────────────────────────
+
+    def test_evaluate_diagnosis_should_regenerate_true_below_max(self):
+        """REJECTED at iteration < MAX_EVAL_ITERATIONS → should_regenerate=True."""
+        with patch("crag_pipeline._groq",
+                   return_value=self._eval_json(self._SOFT, self._HARD)):
+            result = crag_pipeline.evaluate_diagnosis(
+                self._mock_parsed(), self._dx(), [],
+                iteration=crag_pipeline.MAX_EVAL_ITERATIONS - 1
+            )
+        self.assertEqual(result["verdict"], "REJECTED")
+        self.assertTrue(result["should_regenerate"])
+
+    def test_evaluate_diagnosis_should_regenerate_false_at_max(self):
+        """REJECTED at iteration == MAX_EVAL_ITERATIONS → should_regenerate=False."""
+        with patch("crag_pipeline._groq",
+                   return_value=self._eval_json(self._SOFT, self._HARD)):
+            result = crag_pipeline.evaluate_diagnosis(
+                self._mock_parsed(), self._dx(), [],
+                iteration=crag_pipeline.MAX_EVAL_ITERATIONS
+            )
+        self.assertEqual(result["verdict"], "REJECTED")
+        self.assertFalse(result["should_regenerate"])
+
+    # ── 8–9: fail-safe on parse error ────────────────────────────────────────
+
+    def test_evaluate_diagnosis_parse_error_iter0_rejected(self):
+        """Invalid JSON from LLM at iter 0 → REJECTED + should_regenerate=True."""
+        with patch("crag_pipeline._groq", return_value="not json at all {{{{"):
+            result = crag_pipeline.evaluate_diagnosis(
+                self._mock_parsed(), self._dx(), [], iteration=0
+            )
+        self.assertEqual(result["verdict"], "REJECTED")
+        self.assertTrue(result["should_regenerate"])
+        self.assertEqual(result["criteria_passed"], [])
+        self.assertEqual(sorted(result["criteria_failed"]), sorted(self._ALL))
+
+    def test_evaluate_diagnosis_parse_error_iter_max_approved_failopen(self):
+        """Invalid JSON at iter == MAX_EVAL_ITERATIONS → APPROVED fail-open."""
+        with patch("crag_pipeline._groq", return_value="not json at all {{{{"):
+            result = crag_pipeline.evaluate_diagnosis(
+                self._mock_parsed(), self._dx(), [],
+                iteration=crag_pipeline.MAX_EVAL_ITERATIONS
+            )
+        self.assertEqual(result["verdict"], "APPROVED")
+        self.assertFalse(result["should_regenerate"])
+        self.assertIn("exaustão", result["critique"])
+
+    # ── 10–11: run_crag loop iteration count ─────────────────────────────────
+
+    def test_run_crag_loop_stops_at_iter0_on_immediate_approval(self):
+        """evaluate_diagnosis APPROVED on first call → generate called exactly once."""
+        patches = self._run_crag_mocks(eval_side_effects=[self._approved_eval_result()])
+        with patches[0], patches[1], patches[2] as mock_gen, patches[3], patches[4]:
+            crag_pipeline.run_crag(MagicMock(), self._mock_parsed(), "INC-T1")
+        self.assertEqual(mock_gen.call_count, 1)
+
+    def test_run_crag_loop_two_iterations_on_rejected_then_approved(self):
+        """REJECTED iter 0, APPROVED iter 1 → generate called exactly twice."""
+        eval_seq = [
+            self._rejected_eval_result(should_regenerate=True),
+            self._approved_eval_result(),
+        ]
+        patches = self._run_crag_mocks(eval_side_effects=eval_seq)
+        with patches[0], patches[1], patches[2] as mock_gen, patches[3], patches[4]:
+            crag_pipeline.run_crag(MagicMock(), self._mock_parsed(), "INC-T2")
+        self.assertEqual(mock_gen.call_count, 2)
+
+    # ── 12: _meta eval fields ─────────────────────────────────────────────────
+
+    def test_run_crag_meta_contains_all_eval_fields(self):
+        """_meta must contain all eval_* fields after run_crag."""
+        patches = self._run_crag_mocks(eval_side_effects=[self._approved_eval_result()])
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            result = crag_pipeline.run_crag(MagicMock(), self._mock_parsed(), "INC-T3")
+
+        meta = result["_meta"]
+        for field in ("eval_iterations", "eval_final_verdict",
+                      "eval_criteria_passed", "eval_score_history"):
+            with self.subTest(field=field):
+                self.assertIn(field, meta)
+
+        self.assertEqual(meta["eval_iterations"], 1)
+        self.assertEqual(meta["eval_final_verdict"], "APPROVED")
+        self.assertIsInstance(meta["eval_score_history"], list)
+        self.assertEqual(len(meta["eval_score_history"]), 1)
+
+    # ── 13: alerta_hitl safety coupling ──────────────────────────────────────
+
+    def test_run_crag_alerta_hitl_forced_on_rejected_max_iter(self):
+        """All iterations REJECTED → alerta_hitl overridden with escalation warning."""
+        # 3 REJECTED results (MAX_EVAL_ITERATIONS=2 → iterations 0,1,2)
+        rejected_seq = [
+            self._rejected_eval_result(should_regenerate=True),   # iter 0
+            self._rejected_eval_result(should_regenerate=True),   # iter 1
+            self._rejected_eval_result(should_regenerate=False),  # iter 2 — exausted
+        ]
+        patches = self._run_crag_mocks(eval_side_effects=rejected_seq)
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            result = crag_pipeline.run_crag(MagicMock(), self._mock_parsed(), "INC-T4")
+
+        self.assertIn("⚠️", result["alerta_hitl"])
+        self.assertIn("Revisão humana", result["alerta_hitl"])
+        self.assertEqual(result["_meta"]["eval_final_verdict"], "REJECTED")
+        self.assertEqual(result["_meta"]["eval_iterations"], 3)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     unittest.main(verbosity=2)

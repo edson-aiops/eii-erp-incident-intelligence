@@ -218,13 +218,22 @@ def render_audit_log() -> str:
         sev_icon = SEV.get(dx.get("severidade", "MÉDIO"), ("⚪", "#888"))[0]
         meta    = dx.get("_meta", {})
 
+        eval_verdict   = meta.get("eval_final_verdict", "")
+        eval_iters     = meta.get("eval_iterations", "")
+        eval_badge     = ""
+        if eval_verdict == "APPROVED":
+            superscript = f"<sup>{eval_iters}</sup>" if eval_iters else ""
+            eval_badge  = f" &nbsp;|&nbsp; **Avaliação:** ✅ APROVADO{superscript}"
+        elif eval_verdict:
+            eval_badge  = f" &nbsp;|&nbsp; **Avaliação:** ⚠️ MAX_ITER ({eval_iters}x)"
+
         md += (
             f"### {icon} `{dx['incident_id']}` — {status}\n"
             f"**Evento:** {dx.get('evento', '—')} &nbsp;|&nbsp; "
             f"**Erro:** `{dx.get('codigo_erro', '—')}` &nbsp;|&nbsp; "
             f"**Severidade:** {sev_icon} {dx.get('severidade', '—')}\n\n"
             f"**Confiança:** {CONF.get(dx.get('confianca','BAIXA'),'—')} "
-            f"*(P={meta.get('logprob_sim', '—')})* &nbsp;|&nbsp; "
+            f"*(P={meta.get('logprob_sim', '—')})*{eval_badge} &nbsp;|&nbsp; "
             f"**Fonte:** `{dx.get('fonte','—')}` &nbsp;|&nbsp; "
             f"**Docs KB:** {meta.get('candidates_relevant', 0)}/{meta.get('candidates_retrieved', 0)}\n\n"
             f"**Causa:** {dx.get('causa_raiz', '—')[:200]}...\n\n"
@@ -258,6 +267,52 @@ def render_parsed_xml(parsed) -> str:
 """
 
 
+def _render_eval_section(meta: dict) -> str:
+    """Renders the EvaluatorAgent quality assessment section."""
+    verdict    = meta.get("eval_final_verdict", "")
+    iterations = meta.get("eval_iterations", 0)
+    passed     = meta.get("eval_criteria_passed", [])
+    failed     = meta.get("eval_criteria_failed", [])
+    critique   = meta.get("eval_critique_last", "")
+
+    if not verdict:
+        return ""   # old records without eval data — render nothing
+
+    verdict_badge = "✅ APROVADO" if verdict == "APPROVED" else "⚠️ NÃO APROVADO"
+    iter_note = f"Gerado em {iterations} tentativa(s)"
+
+    _LABELS = {
+        "causal_coherence":        "Coerência causal",
+        "resolution_actionability": "Acionabilidade dos passos",
+        "kb_grounding":            "Aderência à KB",
+        "schema_completeness":     "Completude do schema",
+        "severity_calibration":    "Calibração de severidade",
+    }
+
+    criteria_rows = "\n".join(
+        f"| {_LABELS.get(c, c)} | ✅ PASS |" for c in passed
+    ) + "\n" + "\n".join(
+        f"| {_LABELS.get(c, c)} | ❌ FAIL |" for c in failed
+    )
+
+    critique_block = (
+        f"\n> **Crítica do avaliador:** {critique}\n"
+        if verdict != "APPROVED" and critique else ""
+    )
+
+    return f"""
+---
+
+### 🤖 Avaliação Automática de Qualidade — {verdict_badge}
+
+*{iter_note}*
+
+| Critério | Resultado |
+|---|---|
+{criteria_rows}
+{critique_block}"""
+
+
 def render_diagnosis(dx: dict, parsed) -> str:
     sev   = dx.get("severidade", "MÉDIO")
     conf  = dx.get("confianca", "BAIXA")
@@ -289,6 +344,7 @@ def render_diagnosis(dx: dict, parsed) -> str:
 
 ### 🔍 Causa Raiz Provável
 {dx.get('causa_raiz', '—')}
+{_render_eval_section(meta)}
 
 ---
 

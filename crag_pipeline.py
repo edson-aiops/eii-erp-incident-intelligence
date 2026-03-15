@@ -1,6 +1,6 @@
 """
 EII — CRAG Pipeline
-Corrective RAG: Retrieve → Grade → Generate
+Corrective RAG: Retrieve → Grade → [Generate → Evaluate ⟳] → Confidence
 """
 
 import chromadb
@@ -216,7 +216,8 @@ def grade(query: str, candidates: list) -> list:
 # Step 3 — Generate
 # ─────────────────────────────────────────────────────────────────────────────
 
-def generate(parsed_xml, relevant: list, incident_id: str) -> dict:
+def generate(parsed_xml, relevant: list, incident_id: str,
+             corrective_hint: str = "") -> dict:
     # Build context from relevant KB docs
     if relevant:
         ctx = "\n\n".join([
@@ -249,13 +250,18 @@ def generate(parsed_xml, relevant: list, incident_id: str) -> dict:
         f"Ocorrências:\n{ocorrencias_txt}"
     )
 
+    correction_block = (
+        f"\n\n[Correção solicitada pelo avaliador]: {corrective_hint}"
+        if corrective_hint else ""
+    )
+
     prompt = f"""Você é o EII (ERP Incident Intelligence), especialista em falhas de integração com o governo brasileiro — eSocial, webservices da RFB e obrigações acessórias.
 
 INCIDENTE:
 {incident_desc}
 
 CONTEXTO DA BASE DE CONHECIMENTO:
-{ctx}
+{ctx}{correction_block}
 
 Gere um diagnóstico técnico preciso em JSON. Responda APENAS com o JSON, sem texto adicional:
 {{
@@ -302,6 +308,146 @@ Gere um diagnóstico técnico preciso em JSON. Responda APENAS com o JSON, sem t
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Step 4 — EvaluatorAgent (Evaluator-Optimizer pattern)
+# Uses MODEL_ROUTER (8b) to score the diagnosis against 5 quality criteria.
+# Returns a structured EvalResult that drives the generate→evaluate loop.
+#
+# Criteria (hard gates: 1,2,4 — soft: 3,5):
+#   1. causal_coherence        — causa_raiz explains the actual error codes
+#   2. resolution_actionability — passos_resolucao are specific and actionable
+#   3. kb_grounding            — diagnosis is consistent with retrieved KB docs
+#   4. schema_completeness     — all required fields present and non-empty
+#   5. severity_calibration    — severidade is proportional to the error
+# ─────────────────────────────────────────────────────────────────────────────
+
+MAX_EVAL_ITERATIONS = 2   # up to 3 total generate calls (iter 0, 1, 2)
+
+_EVAL_CRITERIA = [
+    "causal_coherence",
+    "resolution_actionability",
+    "kb_grounding",
+    "schema_completeness",
+    "severity_calibration",
+]
+_EVAL_HARD_GATES = {"causal_coherence", "resolution_actionability", "schema_completeness"}
+
+
+def _eval_verdict(criteria_passed: list) -> str:
+    """APPROVED iff all hard gates pass AND at least one soft criterion passes."""
+    passed = set(criteria_passed)
+    if not _EVAL_HARD_GATES.issubset(passed):
+        return "REJECTED"
+    soft = {"kb_grounding", "severity_calibration"}
+    if soft.isdisjoint(passed):
+        return "REJECTED"
+    return "APPROVED"
+
+
+def evaluate_diagnosis(parsed_xml, diagnosis: dict, relevant: list,
+                       iteration: int) -> dict:
+    """
+    Evaluates a generated diagnosis against 5 quality criteria.
+    Returns an EvalResult dict:
+      verdict            "APPROVED" | "REJECTED"
+      criteria_passed    list[str]
+      criteria_failed    list[str]
+      critique           str  (PT-BR; "" if APPROVED)
+      should_regenerate  bool
+      regeneration_hint  str  (imperative directive for next generate call)
+    """
+    ocorrencias_txt = "; ".join(
+        f"[{o.codigo}] {o.descricao[:80]}" for o in parsed_xml.ocorrencias[:3]
+    ) or parsed_xml.cd_resposta
+
+    kb_ctx = "\n".join(
+        f"- [{d['item']['id']}] {d['item']['titulo']} | Erro: {d['item']['codigo_erro']}"
+        for d in relevant[:3]
+    ) or "(nenhum doc KB relevante — fonte LLM_FALLBACK)"
+
+    passos = diagnosis.get("passos_resolucao", [])
+    passos_txt = "\n".join(f"  {i+1}. {p}" for i, p in enumerate(passos)) or "  (vazio)"
+
+    prompt = f"""Você é um avaliador técnico de diagnósticos eSocial. Avalie o diagnóstico abaixo contra 5 critérios.
+
+INCIDENTE:
+- Evento: {parsed_xml.tipo_evento or '?'} | cdResposta: {parsed_xml.cd_resposta}
+- Ocorrências: {ocorrencias_txt}
+
+DOCS KB RELEVANTES:
+{kb_ctx}
+
+DIAGNÓSTICO GERADO:
+- codigo_erro: {diagnosis.get('codigo_erro', '')}
+- severidade: {diagnosis.get('severidade', '')}
+- causa_raiz: {diagnosis.get('causa_raiz', '')[:400]}
+- passos_resolucao:
+{passos_txt}
+- validacao: {diagnosis.get('validacao', '')[:200]}
+- alerta_hitl: {diagnosis.get('alerta_hitl', '')[:150]}
+
+CRITÉRIOS (avalie cada um como PASS ou FAIL):
+1. causal_coherence: causa_raiz explica tecnicamente os códigos de erro e ocorrências reais?
+2. resolution_actionability: os passos são específicos e acionáveis (referenciam campo/evento/regra), não genéricos?
+3. kb_grounding: o diagnóstico é consistente com os docs KB listados acima?
+4. schema_completeness: todos os campos obrigatórios presentes e não-vazios? passos_resolucao tem ≥2 itens?
+5. severity_calibration: a severidade é proporcional ao tipo de erro?
+
+Responda APENAS com JSON, sem texto adicional:
+{{
+  "criteria_passed": ["nome_criterio", ...],
+  "criteria_failed": ["nome_criterio", ...],
+  "critique": "explicação concisa em português do que falhou (vazio se tudo passou)",
+  "regeneration_hint": "instrução imperativa e específica para corrigir o próximo diagnóstico (vazio se aprovado)"
+}}"""
+
+    raw = _groq(
+        [{"role": "user", "content": prompt}],
+        max_tokens=500,
+        model=MODEL_ROUTER,
+    )
+
+    # Parse evaluator response
+    try:
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        data = json.loads(match.group() if match else raw)
+        criteria_passed = [c for c in data.get("criteria_passed", []) if c in _EVAL_CRITERIA]
+        criteria_failed = [c for c in data.get("criteria_failed", []) if c in _EVAL_CRITERIA]
+        # Ensure every criterion is accounted for
+        accounted = set(criteria_passed) | set(criteria_failed)
+        for c in _EVAL_CRITERIA:
+            if c not in accounted:
+                criteria_failed.append(c)
+        critique          = data.get("critique", "")[:400]
+        regeneration_hint = data.get("regeneration_hint", "")[:300]
+        verdict = _eval_verdict(criteria_passed)
+    except Exception:
+        # Fail-safe: iteration 0 → force retry; iteration ≥ MAX → fail-open
+        if iteration < MAX_EVAL_ITERATIONS:
+            criteria_passed = []
+            criteria_failed = list(_EVAL_CRITERIA)
+            critique = "Falha ao parsear resposta do avaliador."
+            regeneration_hint = "Gere um diagnóstico completo seguindo exatamente o schema JSON solicitado."
+            verdict = "REJECTED"
+        else:
+            criteria_passed = list(_EVAL_CRITERIA)
+            criteria_failed = []
+            critique = "Avaliador não pôde ser executado — diagnóstico aceito por exaustão de tentativas."
+            regeneration_hint = ""
+            verdict = "APPROVED"
+
+    should_regenerate = (verdict == "REJECTED") and (iteration < MAX_EVAL_ITERATIONS)
+
+    return {
+        "verdict":            verdict,
+        "criteria_passed":    criteria_passed,
+        "criteria_failed":    criteria_failed,
+        "critique":           critique,
+        "should_regenerate":  should_regenerate,
+        "regeneration_hint":  regeneration_hint,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Full CRAG pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -318,16 +464,56 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str) -> dict:
 
     candidates = retrieve(col, query)
     relevant   = grade(query, candidates)
-    diagnosis  = generate(parsed_xml, relevant, incident_id)
+
+    # ── Evaluator-Optimizer loop ──────────────────────────────────────────────
+    corrective_hint = ""
+    eval_history    = []
+
+    for iteration in range(MAX_EVAL_ITERATIONS + 1):
+        diagnosis  = generate(parsed_xml, relevant, incident_id,
+                               corrective_hint=corrective_hint)
+        eval_result = evaluate_diagnosis(parsed_xml, diagnosis, relevant, iteration)
+        eval_history.append(eval_result)
+
+        if not eval_result["should_regenerate"]:
+            break
+
+        corrective_hint = eval_result["regeneration_hint"]
+
+    final_eval = eval_history[-1]
+
+    # Safety coupling: REJECTED_MAX_ITER → force HITL escalation
+    if final_eval["verdict"] != "APPROVED":
+        diagnosis["alerta_hitl"] = (
+            "⚠️ Avaliador automático não aprovou este diagnóstico após "
+            f"{len(eval_history)} tentativa(s). Revisão humana obrigatória. "
+            + (final_eval["critique"] or "")
+        )[:500]
 
     # ADR-001: override LLM-generated confianca with calibrated logprob score
     confianca, prob_sim = confidence_score(parsed_xml, diagnosis)
     diagnosis["confianca"] = confianca
 
     diagnosis["_meta"] = {
-        "candidates_retrieved": len(candidates),
-        "candidates_relevant": len(relevant),
-        "query_used": query[:200],
-        "logprob_sim": round(prob_sim, 3),
+        # existing fields
+        "candidates_retrieved":  len(candidates),
+        "candidates_relevant":   len(relevant),
+        "query_used":            query[:200],
+        "logprob_sim":           round(prob_sim, 3),
+        # evaluator fields
+        "eval_iterations":       len(eval_history),
+        "eval_final_verdict":    final_eval["verdict"],
+        "eval_criteria_passed":  final_eval["criteria_passed"],
+        "eval_criteria_failed":  final_eval["criteria_failed"],
+        "eval_critique_last":    final_eval["critique"][:400],
+        "eval_score_history":    [
+            {
+                "iteration":       i,
+                "verdict":         e["verdict"],
+                "criteria_passed": e["criteria_passed"],
+                "criteria_failed": e["criteria_failed"],
+            }
+            for i, e in enumerate(eval_history)
+        ],
     }
     return diagnosis

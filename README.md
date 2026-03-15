@@ -93,7 +93,20 @@ uma limitação técnica.
 
 ---
 
-*Desenvolvido por Edson · Senior IT Systems Analyst · 12+ anos em HCM/ERP*  
+## 📄 Documentação
+
+| Doc | Descrição |
+|---|---|
+| [CHANGELOG.md](CHANGELOG.md) | Histórico de versões por phase |
+| [docs/PRD.md](docs/PRD.md) | Product Requirements Document completo |
+
+---
+
+*Desenvolvido por Edson · Senior IT Systems Analyst · 12+ anos em HCM/ERP*
 *Portfolio: IA aplicada a compliance e operações de RH no Brasil*
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+[![Phase](https://img.shields.io/badge/Phase-2%20Complete-brightgreen)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/Tests-46%20passing-brightgreen)](tests/test_phase2.py)
+[![LGPD](https://img.shields.io/badge/LGPD-Privacy%20by%20Design-blue)](docs/PRD.md#nfr-01--lgpd-privacy-by-design)
+[![Model](https://img.shields.io/badge/LLM-Llama%203.3%2070B%20%2B%208B-orange)](docs/PRD.md#nfr-02--custo-controlado-cost-efficiency)

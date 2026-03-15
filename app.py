@@ -22,7 +22,21 @@ COLLECTION = build_vector_store()
 # DB_PATH: set to /data/eii_incidents.db in HuggingFace Spaces (persistent vol)
 # ─────────────────────────────────────────────────────────────────────────────
 
-DB_PATH = os.environ.get("DB_PATH", "eii_incidents.db")
+_DEFAULT_DB = "eii_incidents.db"
+_CONFIGURED_PATH = os.environ.get("DB_PATH", _DEFAULT_DB)
+
+def _resolve_db_path() -> str:
+    """Return a usable DB path, falling back to local if /data is not accessible."""
+    path = _CONFIGURED_PATH
+    if path.startswith("/data"):
+        data_dir = os.path.dirname(path)
+        try:
+            os.makedirs(data_dir, exist_ok=True)
+        except OSError:
+            return _DEFAULT_DB
+    return path
+
+DB_PATH = _resolve_db_path()
 
 
 def _db_conn() -> sqlite3.Connection:

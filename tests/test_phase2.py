@@ -800,6 +800,315 @@ class TestEvaluatorAgent(unittest.TestCase):
         self.assertEqual(result["_meta"]["eval_iterations"], 3)
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# 7. Reflexion (ADR-002)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TestReflexion(unittest.TestCase):
+    """
+    Tests for the Reflexion mechanism (ADR-002).
+    Covers _reflexion_should_trigger, reflect(), and run_crag integration.
+    Zero real API calls — all LLM/pipeline steps are mocked.
+    """
+
+    _ALL  = list(crag_pipeline._EVAL_CRITERIA)
+    _HARD = sorted(crag_pipeline._EVAL_HARD_GATES)
+    _SOFT = ["kb_grounding", "severity_calibration"]
+
+    # ── fixtures ──────────────────────────────────────────────────────────────
+
+    def _mock_parsed(self):
+        p = MagicMock()
+        p.tipo_evento   = "S-2200"
+        p.cd_resposta   = "401"
+        p.desc_resposta = "Rejeitado"
+        p.nr_inscricao  = "[CNPJ/****95]"
+        p.ocorrencias   = []
+        p.error_codes   = ["E312"]
+        return p
+
+    def _dx(self):
+        """Trigger-INACTIVE fixture: ALTO + ALTA + KB_MATCH."""
+        return {
+            "incident_id":      "INC-NTR",
+            "evento":           "S-1200",
+            "codigo_erro":      "E428",
+            "severidade":       "ALTO",
+            "causa_raiz":       "indRetif incorreto",
+            "confianca":        "ALTA",
+            "fonte":            "KB_MATCH",
+            "passos_resolucao": ["passo 1", "passo 2"],
+            "validacao":        "verificar",
+            "tempo_estimado":   "1h",
+            "referencias_kb":   ["KB001"],
+            "alerta_hitl":      "revisar",
+        }
+
+    def _dx_critico(self):
+        """Trigger-ACTIVE via severidade==CRÍTICO."""
+        return {
+            "incident_id":      "INC-RFX",
+            "evento":           "S-2200",
+            "codigo_erro":      "E312",
+            "severidade":       "CRÍTICO",
+            "causa_raiz":       "vínculo não encontrado na base",
+            "confianca":        "ALTA",
+            "fonte":            "KB_MATCH",
+            "passos_resolucao": ["passo 1 detalhado", "passo 2 detalhado"],
+            "validacao":        "verificar reprocessamento",
+            "tempo_estimado":   "2h",
+            "referencias_kb":   ["KB002"],
+            "alerta_hitl":      "revisar antes de executar",
+        }
+
+    def _dx_baixa_confianca(self):
+        """Trigger-ACTIVE via confianca==BAIXA (severidade e fonte neutros)."""
+        dx = self._dx_critico().copy()
+        dx["severidade"] = "MÉDIO"
+        dx["confianca"]  = "BAIXA"
+        dx["fonte"]      = "KB_MATCH"
+        return dx
+
+    def _dx_llm_fallback(self):
+        """Trigger-ACTIVE via fonte==LLM_FALLBACK (severidade e confianca neutros)."""
+        dx = self._dx_critico().copy()
+        dx["severidade"] = "MÉDIO"
+        dx["confianca"]  = "ALTA"
+        dx["fonte"]      = "LLM_FALLBACK"
+        return dx
+
+    def _approved_eval_result(self):
+        return {
+            "verdict":           "APPROVED",
+            "criteria_passed":   self._ALL,
+            "criteria_failed":   [],
+            "critique":          "",
+            "should_regenerate": False,
+            "regeneration_hint": "",
+        }
+
+    def _rejected_eval_result(self, should_regenerate=True):
+        return {
+            "verdict":           "REJECTED",
+            "criteria_passed":   self._SOFT,
+            "criteria_failed":   self._HARD,
+            "critique":          "Hard gates falharam.",
+            "should_regenerate": should_regenerate,
+            "regeneration_hint": "Corrija a causa_raiz.",
+        }
+
+    def _run_crag_mocks(self, eval_side_effects, generate_return=None,
+                        reflect_return="Reflexão automática: diagnóstico anterior incorreto."):
+        """
+        6-patch tuple covering all run_crag dependencies, including reflect().
+        generate_return defaults to _dx_critico() so the Reflexion trigger is
+        active by default; pass self._dx() explicitly to test the inactive path.
+        """
+        if generate_return is None:
+            generate_return = self._dx_critico()
+        return (
+            patch("crag_pipeline.retrieve",           return_value=[]),
+            patch("crag_pipeline.grade",              return_value=[]),
+            patch("crag_pipeline.generate",           return_value=generate_return),
+            patch("crag_pipeline.evaluate_diagnosis", side_effect=eval_side_effects),
+            patch("crag_pipeline.confidence_score",   return_value=("ALTA", 0.92)),
+            patch("crag_pipeline.reflect",            return_value=reflect_return),
+        )
+
+    # ── 1–5: _reflexion_should_trigger ───────────────────────────────────────
+
+    def test_trigger_critico(self):
+        """severidade==CRÍTICO → (True, 'CRÍTICO')."""
+        triggered, reason = crag_pipeline._reflexion_should_trigger(self._dx_critico())
+        self.assertTrue(triggered)
+        self.assertEqual(reason, "CRÍTICO")
+
+    def test_trigger_baixa_confianca(self):
+        """confianca==BAIXA → (True, 'BAIXA_CONFIANCA')."""
+        triggered, reason = crag_pipeline._reflexion_should_trigger(self._dx_baixa_confianca())
+        self.assertTrue(triggered)
+        self.assertEqual(reason, "BAIXA_CONFIANCA")
+
+    def test_trigger_llm_fallback(self):
+        """fonte==LLM_FALLBACK → (True, 'LLM_FALLBACK')."""
+        triggered, reason = crag_pipeline._reflexion_should_trigger(self._dx_llm_fallback())
+        self.assertTrue(triggered)
+        self.assertEqual(reason, "LLM_FALLBACK")
+
+    def test_trigger_inactive_alto_alta_kb_match(self):
+        """ALTO + ALTA + KB_MATCH → (False, '') — nenhuma condição satisfeita."""
+        triggered, reason = crag_pipeline._reflexion_should_trigger(self._dx())
+        self.assertFalse(triggered)
+        self.assertEqual(reason, "")
+
+    def test_trigger_critico_prevails_over_normal_confianca_and_fonte(self):
+        """OR lógico: CRÍTICO retorna True mesmo com confianca=ALTA e fonte=KB_MATCH."""
+        dx = {"severidade": "CRÍTICO", "confianca": "ALTA", "fonte": "KB_MATCH"}
+        triggered, reason = crag_pipeline._reflexion_should_trigger(dx)
+        self.assertTrue(triggered)
+        self.assertEqual(reason, "CRÍTICO")
+
+    # ── 6–7: reflect() unit ───────────────────────────────────────────────────
+
+    def test_reflect_returns_nonempty_string_when_groq_mocked(self):
+        """reflect() must return the string from _groq unchanged."""
+        mock_text = "O diagnóstico anterior ignorou o campo indRetif — corrigir."
+        with patch("crag_pipeline._groq", return_value=mock_text):
+            result = crag_pipeline.reflect(
+                self._mock_parsed(),
+                self._dx_critico(),
+                self._rejected_eval_result(),
+            )
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result), 0)
+        self.assertEqual(result, mock_text)
+
+    def test_reflect_uses_model_generator_not_router(self):
+        """reflect() must call _groq with model=MODEL_GENERATOR (70b), not MODEL_ROUTER (8b)."""
+        with patch("crag_pipeline._groq", return_value="reflexão") as mock_groq:
+            crag_pipeline.reflect(
+                self._mock_parsed(),
+                self._dx_critico(),
+                self._rejected_eval_result(),
+            )
+        call_kwargs = mock_groq.call_args[1]
+        self.assertEqual(call_kwargs.get("model"), crag_pipeline.MODEL_GENERATOR)
+        self.assertNotEqual(call_kwargs.get("model"), crag_pipeline.MODEL_ROUTER)
+        self.assertIn("70b", call_kwargs.get("model", ""))
+
+    # ── 8–10: run_crag — reflect() call-count guards ──────────────────────────
+
+    def test_run_crag_reflect_called_once_when_trigger_active_iter0_rejected(self):
+        """reflect() called exactly 1× : trigger active + iter 0 REJECTED."""
+        eval_seq = [
+            self._rejected_eval_result(should_regenerate=True),
+            self._approved_eval_result(),
+        ]
+        patches = self._run_crag_mocks(eval_side_effects=eval_seq)
+        with patches[0], patches[1], patches[2], patches[3], patches[4], \
+             patches[5] as mock_reflect:
+            crag_pipeline.run_crag(MagicMock(), self._mock_parsed(), "INC-T8")
+        self.assertEqual(mock_reflect.call_count, 1)
+
+    def test_run_crag_reflect_not_called_when_trigger_inactive(self):
+        """reflect() never called when dx is ALTO + ALTA + KB_MATCH (trigger inactive)."""
+        eval_seq = [
+            self._rejected_eval_result(should_regenerate=True),
+            self._approved_eval_result(),
+        ]
+        patches = self._run_crag_mocks(
+            eval_side_effects=eval_seq,
+            generate_return=self._dx(),        # trigger-inactive fixture
+        )
+        with patches[0], patches[1], patches[2], patches[3], patches[4], \
+             patches[5] as mock_reflect:
+            crag_pipeline.run_crag(MagicMock(), self._mock_parsed(), "INC-T9")
+        self.assertEqual(mock_reflect.call_count, 0)
+
+    def test_run_crag_reflect_not_called_when_iter0_approved(self):
+        """reflect() never called when iter 0 is APPROVED — loop exits before trigger check."""
+        patches = self._run_crag_mocks(
+            eval_side_effects=[self._approved_eval_result()],
+            generate_return=self._dx_critico(),    # trigger-active dx, but APPROVED immediately
+        )
+        with patches[0], patches[1], patches[2], patches[3], patches[4], \
+             patches[5] as mock_reflect:
+            crag_pipeline.run_crag(MagicMock(), self._mock_parsed(), "INC-T10")
+        self.assertEqual(mock_reflect.call_count, 0)
+
+    # ── 11: reflection_memory kwarg injected into second generate() ───────────
+
+    def test_run_crag_reflection_memory_passed_to_second_generate(self):
+        """
+        Second generate() call must receive reflection_memory kwarg containing
+        the text returned by reflect().
+
+        Note: Python passes the *same list object* to both calls. After
+        reflect() appends to it, both call_args_list entries reference that
+        mutated list — so we assert on the final state of the second-call kwarg.
+        """
+        reflect_text = "Reflexão específica: causa_raiz deve referenciar nrRecEvt."
+        eval_seq = [
+            self._rejected_eval_result(should_regenerate=True),
+            self._approved_eval_result(),
+        ]
+        patches = self._run_crag_mocks(
+            eval_side_effects=eval_seq,
+            reflect_return=reflect_text,
+        )
+        with patches[0], patches[1], patches[2] as mock_gen, \
+             patches[3], patches[4], patches[5]:
+            crag_pipeline.run_crag(MagicMock(), self._mock_parsed(), "INC-T11")
+
+        self.assertEqual(mock_gen.call_count, 2)
+        second_kwargs = mock_gen.call_args_list[1][1]
+        self.assertIn("reflection_memory", second_kwargs)
+        self.assertIn(reflect_text, second_kwargs["reflection_memory"])
+
+    # ── 12: _meta fields — Reflexion triggered ────────────────────────────────
+
+    def test_run_crag_meta_reflexion_fields_when_triggered(self):
+        """
+        When Reflexion activates: _meta must expose all 4 fields populated
+        correctly (triggered=True, reason='CRÍTICO', iterations=1,
+        history with 1 entry containing required keys).
+        """
+        reflect_text = "Minha reflexão de teste."
+        eval_seq = [
+            self._rejected_eval_result(should_regenerate=True),
+            self._approved_eval_result(),
+        ]
+        patches = self._run_crag_mocks(
+            eval_side_effects=eval_seq,
+            reflect_return=reflect_text,
+        )
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            result = crag_pipeline.run_crag(MagicMock(), self._mock_parsed(), "INC-T12")
+
+        meta = result["_meta"]
+
+        # all 4 fields present
+        for field in ("reflexion_triggered", "reflexion_trigger_reason",
+                      "reflexion_iterations", "reflexion_history"):
+            with self.subTest(field=field):
+                self.assertIn(field, meta)
+
+        # values
+        self.assertTrue(meta["reflexion_triggered"])
+        self.assertEqual(meta["reflexion_trigger_reason"], "CRÍTICO")
+        self.assertEqual(meta["reflexion_iterations"], 1)
+        self.assertIsInstance(meta["reflexion_history"], list)
+        self.assertEqual(len(meta["reflexion_history"]), 1)
+
+        # history entry structure
+        entry = meta["reflexion_history"][0]
+        for key in ("iteration", "reflection_text", "eval_verdict_before", "criteria_failed"):
+            with self.subTest(key=key):
+                self.assertIn(key, entry)
+        self.assertEqual(entry["eval_verdict_before"], "REJECTED")
+        self.assertEqual(entry["iteration"], 0)
+
+    # ── 13: _meta fields — Reflexion NOT triggered ────────────────────────────
+
+    def test_run_crag_meta_reflexion_triggered_false_when_inactive(self):
+        """
+        When trigger is inactive: reflexion_triggered=False, reason='',
+        iterations=0, history=[].
+        """
+        patches = self._run_crag_mocks(
+            eval_side_effects=[self._approved_eval_result()],
+            generate_return=self._dx(),    # trigger-inactive
+        )
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            result = crag_pipeline.run_crag(MagicMock(), self._mock_parsed(), "INC-T13")
+
+        meta = result["_meta"]
+        self.assertFalse(meta["reflexion_triggered"])
+        self.assertEqual(meta["reflexion_trigger_reason"], "")
+        self.assertEqual(meta["reflexion_iterations"], 0)
+        self.assertEqual(meta["reflexion_history"], [])
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     unittest.main(verbosity=2)

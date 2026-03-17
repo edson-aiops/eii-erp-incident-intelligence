@@ -217,7 +217,8 @@ def grade(query: str, candidates: list) -> list:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate(parsed_xml, relevant: list, incident_id: str,
-             corrective_hint: str = "") -> dict:
+             corrective_hint: str = "",
+             reflection_memory: list = None) -> dict:
     # Build context from relevant KB docs
     if relevant:
         ctx = "\n\n".join([
@@ -255,13 +256,23 @@ def generate(parsed_xml, relevant: list, incident_id: str,
         if corrective_hint else ""
     )
 
+    if reflection_memory:
+        _entries = "\n".join(
+            f"Reflexão {i+1}: {r[:500]}" for i, r in enumerate(reflection_memory)
+        )
+        reflection_block = (
+            f"\n\n[AUTOCRÍTICA DE DIAGNÓSTICOS ANTERIORES REJEITADOS — leve em conta]:\n{_entries}"
+        )
+    else:
+        reflection_block = ""
+
     prompt = f"""Você é o EII (ERP Incident Intelligence), especialista em falhas de integração com o governo brasileiro — eSocial, webservices da RFB e obrigações acessórias.
 
 INCIDENTE:
 {incident_desc}
 
 CONTEXTO DA BASE DE CONHECIMENTO:
-{ctx}{correction_block}
+{ctx}{correction_block}{reflection_block}
 
 Gere um diagnóstico técnico preciso em JSON. Responda APENAS com o JSON, sem texto adicional:
 {{
@@ -320,7 +331,29 @@ Gere um diagnóstico técnico preciso em JSON. Responda APENAS com o JSON, sem t
 #   5. severity_calibration    — severidade is proportional to the error
 # ─────────────────────────────────────────────────────────────────────────────
 
-MAX_EVAL_ITERATIONS = 2   # up to 3 total generate calls (iter 0, 1, 2)
+MAX_EVAL_ITERATIONS      = 2   # up to 3 total generate calls (iter 0, 1, 2)
+MAX_REFLECTION_ITERATIONS = 1  # at most 1 reflect() call per run_crag
+
+
+def _reflexion_should_trigger(diagnosis: dict) -> tuple:
+    """
+    Returns (triggered: bool, reason: str).
+
+    Conditions (OR logic — any one suffices):
+      - severidade == "CRÍTICO"  : high-stakes error, misdiagnosis has fiscal/legal impact
+      - confianca  == "BAIXA"    : LLM self-reported uncertainty (proxy for logprob_sim < 0.45
+                                   which is only available after the loop)
+      - fonte      == "LLM_FALLBACK" : no KB match — parametric knowledge path, higher hallucination risk
+
+    Reflexion is only ever invoked from run_crag() when iter 0 was REJECTED.
+    """
+    if diagnosis.get("severidade") == "CRÍTICO":
+        return True, "CRÍTICO"
+    if diagnosis.get("confianca") == "BAIXA":
+        return True, "BAIXA_CONFIANCA"
+    if diagnosis.get("fonte") == "LLM_FALLBACK":
+        return True, "LLM_FALLBACK"
+    return False, ""
 
 _EVAL_CRITERIA = [
     "causal_coherence",
@@ -448,6 +481,73 @@ Responda APENAS com JSON, sem texto adicional:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Step 5 — Reflexion  (ADR-002)
+# Self-critique: MODEL_GENERATOR (70b) reflects on its own rejected diagnosis.
+# Only triggered for high-stakes cases (CRÍTICO | BAIXA_CONFIANCA | LLM_FALLBACK)
+# at iteration 0 REJECTED. Max 1 reflection per run_crag call.
+#
+# The free-text reflection is accumulated in reflection_memory and injected
+# into the next generate() prompt, giving the model richer episodic context
+# than the structured corrective_hint alone.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def reflect(parsed_xml, diagnosis: dict, eval_result: dict) -> str:
+    """
+    Reflexion step: MODEL_GENERATOR reflects on its own prior failed diagnosis.
+
+    Takes the rejected diagnosis and evaluator critique, produces a free-text
+    verbal self-critique that is stored as episodic memory and injected into
+    the next generate() call.
+
+    Returns the reflection string (~200–400 tokens).
+    """
+    _LABELS = {
+        "causal_coherence":         "Coerência causal",
+        "resolution_actionability": "Acionabilidade dos passos",
+        "kb_grounding":             "Aderência à KB",
+        "schema_completeness":      "Completude do schema",
+        "severity_calibration":     "Calibração de severidade",
+    }
+
+    ocorrencias_txt = "; ".join(
+        f"[{o.codigo}] {o.descricao[:80]}" for o in parsed_xml.ocorrencias[:3]
+    ) or parsed_xml.cd_resposta
+
+    failed_labels = ", ".join(
+        _LABELS.get(c, c) for c in eval_result.get("criteria_failed", [])
+    ) or "critérios gerais"
+
+    passos_resumo = "; ".join(
+        p[:100] for p in diagnosis.get("passos_resolucao", [])[:3]
+    ) or "(vazio)"
+
+    prompt = (
+        "Você é o EII reavaliando seu próprio diagnóstico anterior que foi rejeitado.\n\n"
+        "INCIDENTE:\n"
+        f"- Evento: {parsed_xml.tipo_evento or '?'} | cdResposta: {parsed_xml.cd_resposta}\n"
+        f"- Ocorrências: {ocorrencias_txt}\n\n"
+        "SEU DIAGNÓSTICO ANTERIOR (rejeitado):\n"
+        f"- causa_raiz: {diagnosis.get('causa_raiz', '')[:300]}\n"
+        f"- codigo_erro: {diagnosis.get('codigo_erro', '')}\n"
+        f"- severidade: {diagnosis.get('severidade', '')}\n"
+        f"- passos (resumo): {passos_resumo}\n\n"
+        f"CRITÉRIOS QUE FALHARAM: {failed_labels}\n"
+        f"CRÍTICA DO AVALIADOR: {eval_result.get('critique', '')[:300]}\n\n"
+        "Reflita sobre por que seu diagnóstico estava incorreto. Identifique:\n"
+        "1. Qual foi o erro de raciocínio ou inferência cometido\n"
+        "2. Qual informação do incidente foi ignorada ou mal interpretada\n"
+        "3. Como o próximo diagnóstico deve ser corrigido de forma específica\n\n"
+        "Seja técnico e específico sobre eSocial/RFB. Máximo 250 palavras."
+    )
+
+    return _groq(
+        [{"role": "user", "content": prompt}],
+        max_tokens=400,
+        model=MODEL_GENERATOR,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Full CRAG pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -465,13 +565,19 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str) -> dict:
     candidates = retrieve(col, query)
     relevant   = grade(query, candidates)
 
-    # ── Evaluator-Optimizer loop ──────────────────────────────────────────────
-    corrective_hint = ""
-    eval_history    = []
+    # ── Evaluator-Optimizer + Reflexion loop ─────────────────────────────────
+    corrective_hint      = ""
+    eval_history         = []
+    reflection_memory    = []          # accumulates reflect() outputs
+    reflexion_history    = []          # _meta audit trail
+    reflexion_trigger_reason = ""
 
     for iteration in range(MAX_EVAL_ITERATIONS + 1):
-        diagnosis  = generate(parsed_xml, relevant, incident_id,
-                               corrective_hint=corrective_hint)
+        diagnosis = generate(
+            parsed_xml, relevant, incident_id,
+            corrective_hint=corrective_hint,
+            reflection_memory=reflection_memory,
+        )
         eval_result = evaluate_diagnosis(parsed_xml, diagnosis, relevant, iteration)
         eval_history.append(eval_result)
 
@@ -479,6 +585,25 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str) -> dict:
             break
 
         corrective_hint = eval_result["regeneration_hint"]
+
+        # ── Reflexion gate ────────────────────────────────────────────────────
+        # Activates at iteration 0 REJECTED for high-stakes / low-confidence cases.
+        # MAX_REFLECTION_ITERATIONS=1 caps the reflect() call budget at one per run.
+        if (
+            iteration == 0
+            and len(reflexion_history) < MAX_REFLECTION_ITERATIONS
+        ):
+            triggered, reason = _reflexion_should_trigger(diagnosis)
+            if triggered:
+                reflexion_trigger_reason = reason
+                reflection_text = reflect(parsed_xml, diagnosis, eval_result)
+                reflection_memory.append(reflection_text)
+                reflexion_history.append({
+                    "iteration":          iteration,
+                    "reflection_text":    reflection_text[:600],
+                    "eval_verdict_before": eval_result["verdict"],
+                    "criteria_failed":    eval_result["criteria_failed"],
+                })
 
     final_eval = eval_history[-1]
 
@@ -515,5 +640,10 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str) -> dict:
             }
             for i, e in enumerate(eval_history)
         ],
+        # reflexion fields (ADR-002)
+        "reflexion_triggered":      len(reflexion_history) > 0,
+        "reflexion_trigger_reason": reflexion_trigger_reason,
+        "reflexion_iterations":     len(reflexion_history),
+        "reflexion_history":        reflexion_history,
     }
     return diagnosis

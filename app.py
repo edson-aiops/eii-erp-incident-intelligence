@@ -131,6 +131,7 @@ def analyze_xml(xml_input: str):
             render_placeholder(),
             "⚠️ Cole ou carregue um XML de retorno do eSocial.",
             "",
+            "",
             gr.update(interactive=False),
             gr.update(interactive=False),
         )
@@ -142,6 +143,7 @@ def analyze_xml(xml_input: str):
         return (
             f"## ❌ Erro ao interpretar o XML\n\n```\n{parsed.erro}\n```\n\n"
             "Verifique se o XML é um retorno válido do webservice do eSocial.",
+            "",
             "",
             "",
             gr.update(interactive=False),
@@ -158,6 +160,7 @@ def analyze_xml(xml_input: str):
     return (
         diag_md,
         parse_md,
+        inc_id,
         inc_id,
         gr.update(interactive=True),
         gr.update(interactive=True),
@@ -176,7 +179,7 @@ def _decide(inc_id: str, notes: str, status: str):
     dx = _db_fetch_pending(inc_id) if inc_id else None
     if dx is None:
         return (
-            "❌ ID não encontrado nos incidentes pendentes. Analise um XML primeiro.",
+            "❌ ID não encontrado. Analise um XML primeiro na aba Diagnóstico.",
             render_audit_log(),
         )
 
@@ -227,16 +230,21 @@ def render_audit_log() -> str:
         elif eval_verdict:
             eval_badge  = f" &nbsp;|&nbsp; **Avaliação:** ⚠️ MAX_ITER ({eval_iters}x)"
 
+        logprob_sim = meta.get('logprob_sim')
+        psim_str = f" *(P(SIM) = {logprob_sim:.3f})*" if isinstance(logprob_sim, float) else f" *(P={meta.get('logprob_sim', '—')})*"
+        eval_section = _render_eval_section(meta, compact=True)
+
         md += (
             f"### {icon} `{dx['incident_id']}` — {status}\n"
             f"**Evento:** {dx.get('evento', '—')} &nbsp;|&nbsp; "
             f"**Erro:** `{dx.get('codigo_erro', '—')}` &nbsp;|&nbsp; "
             f"**Severidade:** {sev_icon} {dx.get('severidade', '—')}\n\n"
-            f"**Confiança:** {CONF.get(dx.get('confianca','BAIXA'),'—')} "
-            f"*(P={meta.get('logprob_sim', '—')})*{eval_badge} &nbsp;|&nbsp; "
+            f"**Confiança:** {CONF.get(dx.get('confianca','BAIXA'),'—')}"
+            f"{psim_str}{eval_badge} &nbsp;|&nbsp; "
             f"**Fonte:** `{dx.get('fonte','—')}` &nbsp;|&nbsp; "
             f"**Docs KB:** {meta.get('candidates_relevant', 0)}/{meta.get('candidates_retrieved', 0)}\n\n"
             f"**Causa:** {dx.get('causa_raiz', '—')[:200]}...\n\n"
+            f"{eval_section}\n"
             f"**Notas analista:** {entry.get('notes', '—')}\n\n"
             f"*Registrado: {entry.get('decided_at', '')[:16].replace('T', ' ')}*\n\n---\n\n"
         )
@@ -267,7 +275,7 @@ def render_parsed_xml(parsed) -> str:
 """
 
 
-def _render_eval_section(meta: dict) -> str:
+def _render_eval_section(meta: dict, compact: bool = False) -> str:
     """Renders the EvaluatorAgent quality assessment section."""
     verdict    = meta.get("eval_final_verdict", "")
     iterations = meta.get("eval_iterations", 0)
@@ -278,6 +286,8 @@ def _render_eval_section(meta: dict) -> str:
     if not verdict:
         return ""   # old records without eval data — render nothing
 
+    total      = len(passed) + len(failed)
+    n_approved = len(passed)
     verdict_badge = "✅ APROVADO" if verdict == "APPROVED" else "⚠️ NÃO APROVADO"
     iter_note = f"Gerado em {iterations} tentativa(s)"
 
@@ -295,15 +305,28 @@ def _render_eval_section(meta: dict) -> str:
         f"| {_LABELS.get(c, c)} | ❌ FAIL |" for c in failed
     )
 
+    criteria_badge = (
+        f"**`{n_approved}/{total} critérios aprovados`** &nbsp; {verdict_badge}"
+    )
+
     critique_block = (
         f"\n> **Crítica do avaliador:** {critique}\n"
         if verdict != "APPROVED" and critique else ""
     )
 
+    if compact:
+        return (
+            f"\n*{criteria_badge} — {iter_note}*\n\n"
+            f"| Critério | Resultado |\n|---|---|\n{criteria_rows}\n"
+            f"{critique_block}"
+        )
+
     return f"""
 ---
 
-### 🤖 Avaliação Automática de Qualidade — {verdict_badge}
+### 🤖 Avaliação Automática de Qualidade
+
+{criteria_badge}
 
 *{iter_note}*
 
@@ -327,6 +350,9 @@ def render_diagnosis(dx: dict, parsed) -> str:
     refs = ", ".join(dx.get("referencias_kb", [])) or "—"
     hitl_alert = dx.get("alerta_hitl", "Revisar antes de executar.")
 
+    logprob_sim = meta.get("logprob_sim")
+    psim_display = f"&nbsp; *(P(SIM) = {logprob_sim:.3f})*" if isinstance(logprob_sim, float) else ""
+
     return f"""## {sev_icon} Diagnóstico — `{dx.get('incident_id', '—')}`
 
 | | |
@@ -334,7 +360,7 @@ def render_diagnosis(dx: dict, parsed) -> str:
 | **Evento** | `{dx.get('evento', '—')}` |
 | **Código de Erro** | `{dx.get('codigo_erro', '—')}` |
 | **Severidade** | {sev_icon} **{sev}** |
-| **Confiança IA** | {CONF.get(conf, conf)} |
+| **Confiança IA** | {CONF.get(conf, conf)}{psim_display} |
 | **Fonte do diagnóstico** | `{fonte}` |
 | **Docs KB consultados** | {meta.get('candidates_relevant', 0)} relevantes / {meta.get('candidates_retrieved', 0)} recuperados |
 | **Tempo estimado** | {dx.get('tempo_estimado', '—')} |
@@ -393,48 +419,40 @@ CSS = """
 
 body, .gradio-container {
     font-family: 'IBM Plex Sans', sans-serif !important;
-    background: #0d1117 !important;
-    color: #c9d1d9 !important;
+    background: #F5F7FA !important;
+    color: #1A1A2E !important;
 }
 
 .gradio-container { max-width: 1280px !important; margin: 0 auto !important; }
 
 /* Header */
 .eii-header {
-    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1c2128 100%);
-    border: 1px solid #30363d;
-    border-bottom: 2px solid #f0883e;
+    background: #FFFFFF;
+    border: 1px solid #D1E7DD;
+    border-left: 4px solid #1D9E75;
     border-radius: 8px;
     padding: 24px 32px;
     margin-bottom: 16px;
-    position: relative;
-    overflow: hidden;
-}
-.eii-header::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; height: 2px;
-    background: linear-gradient(90deg, #f0883e, #ff6b6b, #f0883e);
 }
 .eii-header h1 {
     font-family: 'IBM Plex Mono', monospace !important;
     font-size: 1.6rem !important;
     font-weight: 600 !important;
-    color: #f0f6fc !important;
+    color: #1A1A2E !important;
     margin: 0 0 6px !important;
     letter-spacing: -0.5px;
 }
 .eii-header p {
-    color: #8b949e !important;
+    color: #6B7280 !important;
     font-size: 0.88rem !important;
     margin: 0 !important;
     font-family: 'IBM Plex Mono', monospace !important;
 }
 .badge {
     display: inline-block;
-    background: #21262d;
-    border: 1px solid #30363d;
-    color: #f0883e;
+    background: #ECFDF5;
+    border: 1px solid #A7F3D0;
+    color: #065F46;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.72rem;
     font-weight: 600;
@@ -443,22 +461,24 @@ body, .gradio-container {
     margin-left: 8px;
     letter-spacing: 0.5px;
 }
-.badge.green { color: #56d364; border-color: #238636; }
+.badge.green { color: #065F46; border-color: #6EE7B7; background: #D1FAE5; }
+.badge.amber { color: #854F0B; border-color: #FCD34D; background: #FFFBEB; }
+.badge.red   { color: #A32D2D; border-color: #FECACA; background: #FEF2F2; }
 
 /* Tabs */
-.tab-nav { background: #161b22 !important; border-bottom: 1px solid #30363d !important; }
+.tab-nav { background: #FFFFFF !important; border-bottom: 1px solid #E5E7EB !important; }
 .tab-nav button {
     font-family: 'IBM Plex Sans', sans-serif !important;
     font-size: 0.85rem !important;
-    color: #8b949e !important;
+    color: #6B7280 !important;
     border: none !important;
     background: transparent !important;
     padding: 10px 20px !important;
     font-weight: 400 !important;
 }
 .tab-nav button.selected {
-    color: #f0883e !important;
-    border-bottom: 2px solid #f0883e !important;
+    color: #1D9E75 !important;
+    border-bottom: 2px solid #1D9E75 !important;
     font-weight: 600 !important;
 }
 
@@ -466,21 +486,21 @@ body, .gradio-container {
 textarea, input[type="text"] {
     font-family: 'IBM Plex Mono', monospace !important;
     font-size: 0.78rem !important;
-    background: #0d1117 !important;
-    border: 1px solid #30363d !important;
-    color: #c9d1d9 !important;
+    background: #FFFFFF !important;
+    border: 1px solid #D1D5DB !important;
+    color: #1A1A2E !important;
     border-radius: 6px !important;
 }
 textarea:focus, input:focus {
-    border-color: #f0883e !important;
+    border-color: #1D9E75 !important;
     outline: none !important;
-    box-shadow: 0 0 0 2px rgba(240, 136, 62, 0.15) !important;
+    box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.12) !important;
 }
 
 /* Buttons */
 .btn-primary button {
-    background: #f0883e !important;
-    color: #0d1117 !important;
+    background: #1D9E75 !important;
+    color: #FFFFFF !important;
     font-family: 'IBM Plex Sans', sans-serif !important;
     font-weight: 700 !important;
     font-size: 0.9rem !important;
@@ -490,33 +510,33 @@ textarea:focus, input:focus {
     letter-spacing: 0.3px !important;
     transition: all 0.15s ease !important;
 }
-.btn-primary button:hover { background: #fb9a4b !important; transform: translateY(-1px); }
+.btn-primary button:hover { background: #17866200 !important; }
 
 .btn-approve button {
-    background: #238636 !important;
-    color: #fff !important;
+    background: #1D9E75 !important;
+    color: #FFFFFF !important;
     font-family: 'IBM Plex Sans', sans-serif !important;
     font-weight: 600 !important;
     border: none !important;
     border-radius: 6px !important;
 }
-.btn-approve button:hover { background: #2ea043 !important; }
+.btn-approve button:hover { background: #178662 !important; }
 
 .btn-reject button {
-    background: #21262d !important;
-    color: #f85149 !important;
+    background: #FFFFFF !important;
+    color: #A32D2D !important;
     font-family: 'IBM Plex Sans', sans-serif !important;
     font-weight: 600 !important;
-    border: 1px solid #f85149 !important;
+    border: 1px solid #A32D2D !important;
     border-radius: 6px !important;
 }
-.btn-reject button:hover { background: #2d1f1f !important; }
+.btn-reject button:hover { background: #FEF2F2 !important; }
 
 /* Dropdowns */
 .gr-dropdown select, select {
-    background: #161b22 !important;
-    border: 1px solid #30363d !important;
-    color: #c9d1d9 !important;
+    background: #FFFFFF !important;
+    border: 1px solid #D1D5DB !important;
+    color: #1A1A2E !important;
     font-family: 'IBM Plex Mono', monospace !important;
     font-size: 0.8rem !important;
     border-radius: 6px !important;
@@ -524,23 +544,23 @@ textarea:focus, input:focus {
 
 /* Markdown output */
 .markdown-body, .gr-markdown {
-    background: #161b22 !important;
-    border: 1px solid #21262d !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E5E7EB !important;
     border-radius: 8px !important;
     padding: 20px !important;
     font-family: 'IBM Plex Sans', sans-serif !important;
-    color: #c9d1d9 !important;
+    color: #1A1A2E !important;
     min-height: 200px;
 }
 .markdown-body h2 {
     font-family: 'IBM Plex Mono', monospace !important;
-    color: #f0f6fc !important;
-    border-bottom: 1px solid #21262d !important;
+    color: #1A1A2E !important;
+    border-bottom: 1px solid #E5E7EB !important;
     padding-bottom: 8px !important;
     font-size: 1.1rem !important;
 }
 .markdown-body h3 {
-    color: #f0883e !important;
+    color: #1D9E75 !important;
     font-size: 0.95rem !important;
     font-family: 'IBM Plex Mono', monospace !important;
     margin-top: 16px !important;
@@ -551,29 +571,32 @@ textarea:focus, input:focus {
     font-size: 0.85rem !important;
 }
 .markdown-body th {
-    background: #21262d !important;
-    color: #8b949e !important;
+    background: #F9FAFB !important;
+    color: #6B7280 !important;
     padding: 8px 12px !important;
     text-align: left !important;
     font-weight: 600 !important;
+    border-bottom: 1px solid #E5E7EB !important;
 }
 .markdown-body td {
     padding: 8px 12px !important;
-    border-bottom: 1px solid #21262d !important;
+    border-bottom: 1px solid #F3F4F6 !important;
 }
 .markdown-body code {
-    background: #21262d !important;
-    color: #f0883e !important;
+    background: #F3F4F6 !important;
+    color: #1D9E75 !important;
     padding: 2px 6px !important;
     border-radius: 3px !important;
     font-family: 'IBM Plex Mono', monospace !important;
     font-size: 0.83em !important;
 }
 .markdown-body blockquote {
-    border-left: 3px solid #f0883e !important;
+    border-left: 3px solid #1D9E75 !important;
     padding-left: 12px !important;
-    color: #8b949e !important;
+    color: #6B7280 !important;
     margin: 12px 0 !important;
+    background: #F0FDF9 !important;
+    border-radius: 0 4px 4px 0 !important;
 }
 .markdown-body ol li, .markdown-body ul li {
     margin: 6px 0 !important;
@@ -585,22 +608,22 @@ label span {
     font-family: 'IBM Plex Sans', sans-serif !important;
     font-size: 0.8rem !important;
     font-weight: 600 !important;
-    color: #8b949e !important;
+    color: #6B7280 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.5px !important;
 }
 
 /* Panel backgrounds */
-.gr-panel, .gr-box { background: #161b22 !important; }
+.gr-panel, .gr-box { background: #FFFFFF !important; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #0d1117; }
-::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #f0883e; }
+::-webkit-scrollbar-track { background: #F5F7FA; }
+::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #1D9E75; }
 
 /* Separator */
-hr { border-color: #21262d !important; }
+hr { border-color: #E5E7EB !important; }
 
 /* Footer kill */
 footer { display: none !important; }
@@ -674,7 +697,7 @@ with gr.Blocks(
                 with gr.Column(scale=2):
                     diagnosis_md = gr.Markdown(render_placeholder())
 
-                    with gr.Accordion("📄 Detalhes do XML Interpretado", open=False):
+                    with gr.Accordion("📄 Detalhes do XML Interpretado", open=True):
                         parsed_md = gr.Markdown("*Analise um XML para ver os detalhes.*")
 
             inc_id_display = gr.Textbox(
@@ -687,15 +710,15 @@ with gr.Blocks(
         with gr.Tab("✋ Aprovação — Human-in-the-Loop"):
             gr.HTML("""
             <div style="
-                background:#161b22;border:1px solid #30363d;border-left:3px solid #f0883e;
+                background:#FFFBEB;border:1px solid #FCD34D;border-left:3px solid #854F0B;
                 border-radius:8px;padding:16px 20px;margin-bottom:16px;
             ">
-              <strong style="color:#f0f6fc;font-family:'IBM Plex Mono',monospace;">
+              <strong style="color:#854F0B;font-family:'IBM Plex Mono',monospace;">
                 ⚠️ Revisão Humana Obrigatória
               </strong>
-              <p style="color:#8b949e;margin:8px 0 0;font-size:0.85rem;line-height:1.6;">
+              <p style="color:#6B7280;margin:8px 0 0;font-size:0.85rem;line-height:1.6;">
                 O EII gera diagnósticos baseados em IA e histórico de incidentes.<br>
-                <strong style="color:#c9d1d9;">Toda resolução deve ser revisada por um analista antes de ser executada.</strong><br>
+                <strong style="color:#1A1A2E;">Toda resolução deve ser revisada por um analista antes de ser executada.</strong><br>
                 Nenhuma ação é registrada como aprovada sem decisão explícita nesta tela.
               </p>
             </div>
@@ -821,7 +844,7 @@ O HITL é uma decisão de design — não uma limitação técnica.
     analyze_btn.click(
         fn=analyze_xml,
         inputs=[xml_box],
-        outputs=[diagnosis_md, parsed_md, inc_id_display,
+        outputs=[diagnosis_md, parsed_md, inc_id_display, hitl_inc_id,
                  approve_btn, reject_btn],
     )
 

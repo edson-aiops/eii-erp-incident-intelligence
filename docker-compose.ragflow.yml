@@ -1,0 +1,71 @@
+# RAGFlow v0.19.0-slim — POC dual-backend para eii-brasil
+#
+# NÃO USE em produção sem ajustar volumes e secrets.
+# Infinity como vector store (sem Elasticsearch — ~60% menos RAM).
+# Embeddings via Groq (sem modelos locais).
+#
+# Uso:
+#   docker compose -f docker-compose.ragflow.yml up -d
+#   docker compose -f docker-compose.ragflow.yml down -v   # limpa volumes
+
+services:
+  ragflow:
+    image: infiniflow/ragflow:v0.19.0-slim
+    container_name: eii_ragflow
+    restart: unless-stopped
+
+    ports:
+      - "8088:80"         # acesso local em http://localhost:8088
+
+    environment:
+      # -- Banco de dados interno (MySQL embutido no slim) --
+      MYSQL_PASSWORD: eii_ragflow_secret
+
+      # -- Vector store: Infinity (padrão no slim, sem Elasticsearch) --
+      # Não defina ES_HOST para manter Infinity ativo.
+
+      # -- Sem modelos locais: embeddings via API externa (Groq/OpenAI-compat) --
+      # Configure o embedding provider na UI após subir o container:
+      #   Settings → Model Providers → adicionar Groq
+      # A variável abaixo é opcional; evita download de modelos HuggingFace no boot.
+      HUGGINGFACE_OFFLINE: "1"
+
+      # -- Limites de log --
+      LOG_LEVEL: WARNING
+
+    mem_limit: 6g           # hard cap: OOM killer atua acima disso
+    memswap_limit: 6g       # desativa swap para o container
+
+    volumes:
+      - ragflow_data:/ragflow/logs
+      - ragflow_mysql:/var/lib/mysql
+      - ragflow_infinity:/ragflow/infinity_storage
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s     # slim demora ~45s no primeiro boot
+
+volumes:
+  ragflow_data:
+  ragflow_mysql:
+  ragflow_infinity:
+
+# ---------------------------------------------------------------------------
+# AVISO DE RECURSOS (leia antes de subir):
+#
+#   RAM total do sistema : ~7.7 GB
+#   RAM livre agora      : ~1.2 GB   ← CRÍTICO
+#   Limite do container  : 6.0 GB
+#
+#   A imagem ragflow:v0.19.0-slim ocupa ~5–6 GB no disco (compressed ~2.5 GB).
+#   Com apenas 1.2 GB livre, o boot do container vai pressionar o SO ao limite.
+#
+#   Antes de rodar:
+#     1. Fechar aplicações pesadas (browser, IDE, etc.) para liberar ≥ 3 GB
+#     2. Confirmar que Docker Desktop tem ≥ 4 GB alocados:
+#        Docker Desktop → Settings → Resources → Memory ≥ 4096 MB
+#     3. docker pull infiniflow/ragflow:v0.19.0-slim   (separado, ~2.5 GB download)
+# ---------------------------------------------------------------------------

@@ -171,7 +171,25 @@ def confidence_score(parsed_xml, diagnosis: dict) -> tuple:
 # Step 1 — Retrieve
 # ─────────────────────────────────────────────────────────────────────────────
 
-def retrieve(col: chromadb.Collection, query: str, n: int = 5) -> list:
+def retrieve(col: chromadb.Collection, query: str, n: int = 5,
+             backend: str = None) -> list:
+    """
+    Retrieve top-n candidates for *query*.
+
+    backend="ragflow"  → calls RAGFlow Cloud via ragflow_client.retrieve_ragflow()
+    backend="chromadb" → uses the in-memory ChromaDB collection (default)
+    backend=None       → reads EII_RETRIEVAL_BACKEND env var (default: "chromadb")
+
+    The col argument is required for backward compatibility but is ignored when
+    backend="ragflow".
+    """
+    effective_backend = backend or os.environ.get("EII_RETRIEVAL_BACKEND", "chromadb")
+
+    if effective_backend == "ragflow":
+        from ragflow_client import retrieve_ragflow
+        return retrieve_ragflow(query=query, n=n)
+
+    # ── ChromaDB path (default) ───────────────────────────────────────────────
     results = col.query(query_texts=[query], n_results=min(n, len(KB)))
     docs = []
     for i, doc_id in enumerate(results["ids"][0]):
@@ -562,7 +580,8 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str) -> dict:
     ]
     query = " ".join(filter(None, query_parts))
 
-    candidates = retrieve(col, query)
+    backend    = os.environ.get("EII_RETRIEVAL_BACKEND", "chromadb")
+    candidates = retrieve(col, query, backend=backend)
     relevant   = grade(query, candidates)
 
     # ── Evaluator-Optimizer + Reflexion loop ─────────────────────────────────
@@ -621,6 +640,7 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str) -> dict:
 
     diagnosis["_meta"] = {
         # existing fields
+        "retrieval_backend":     backend,
         "candidates_retrieved":  len(candidates),
         "candidates_relevant":   len(relevant),
         "query_used":            query[:200],

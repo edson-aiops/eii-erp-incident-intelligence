@@ -29,7 +29,7 @@ from knowledge_base import KB
 # ─────────────────────────────────────────────────────────────────────────────
 
 BASE_URL       = "https://cloud.ragflow.io"
-UPLOAD_PATH    = "/api/v1/dataset/{dataset_id}/document/upload"
+UPLOAD_PATH    = "/api/v1/datasets/{dataset_id}/documents"
 REQUEST_TIMEOUT = 30  # segundos
 
 
@@ -132,9 +132,9 @@ def _smoke_test() -> None:
     from ragflow_client import retrieve_ragflow
 
     query  = "erro E312 vínculo não encontrado"
-    print(f"\n{'─'*60}")
+    print(f"\n{'-'*60}")
     print(f"Smoke test — query: \"{query}\"  n=3")
-    print(f"{'─'*60}")
+    print(f"{'-'*60}")
 
     results = retrieve_ragflow(query=query, n=3)
 
@@ -184,11 +184,11 @@ def main() -> None:
             print(f"  [FALHOU] {doc_id} - {titulo}")
             failed.append(doc_id)
 
-    print(f"\n{'─'*60}")
+    print(f"\n{'-'*60}")
     print(f"Upload concluído: {success}/{len(KB)} documentos enviados")
     if failed:
         print(f"Falhas: {', '.join(failed)}")
-    print(f"{'─'*60}")
+    print(f"{'-'*60}")
 
     _smoke_test()
 

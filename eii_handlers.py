@@ -11,6 +11,7 @@ so both share the same SQLite file without conflict.
 import json
 import os
 import sqlite3
+import threading
 from datetime import datetime
 
 from xml_parser import parse_esocial_xml
@@ -37,11 +38,15 @@ DB_PATH = _resolve_db_path()
 
 
 def _db_conn() -> sqlite3.Connection:
-    return sqlite3.connect(DB_PATH)
+    con = sqlite3.connect(DB_PATH)
+    con.execute("PRAGMA busy_timeout=5000")
+    return con
 
 
 def _db_init() -> None:
     with _db_conn() as con:
+        con.execute("PRAGMA journal_mode=WAL")
+        con.execute("PRAGMA busy_timeout=5000")
         con.execute("""
             CREATE TABLE IF NOT EXISTS incidents (
                 id             TEXT PRIMARY KEY,
@@ -85,12 +90,15 @@ def _db_decide(inc_id: str, status: str, notes: str) -> None:
 # ── Collection (lazy init — avoids loading ChromaDB at import time) ───────────
 
 _collection = None
+_collection_lock = threading.Lock()
 
 
 def _get_collection():
     global _collection
     if _collection is None:
-        _collection = build_vector_store()
+        with _collection_lock:           # double-checked locking — avoids race on first call
+            if _collection is None:
+                _collection = build_vector_store()
     return _collection
 
 

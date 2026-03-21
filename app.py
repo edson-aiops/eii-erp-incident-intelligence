@@ -7,15 +7,18 @@ import gradio as gr
 import json
 import os
 import sqlite3
+import threading
 from datetime import datetime
 from xml_parser import parse_esocial_xml, SAMPLE_XMLS
 from crag_pipeline import build_vector_store, run_crag
+from batch_processor import batch_analyze_streaming
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Init
 # ─────────────────────────────────────────────────────────────────────────────
 
 COLLECTION = build_vector_store()
+_collection_lock = threading.RLock()   # guards concurrent access to COLLECTION
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Persistence — SQLite
@@ -40,11 +43,15 @@ DB_PATH = _resolve_db_path()
 
 
 def _db_conn() -> sqlite3.Connection:
-    return sqlite3.connect(DB_PATH)
+    con = sqlite3.connect(DB_PATH)
+    con.execute("PRAGMA busy_timeout=5000")
+    return con
 
 
 def _db_init() -> None:
     with _db_conn() as con:
+        con.execute("PRAGMA journal_mode=WAL")
+        con.execute("PRAGMA busy_timeout=5000")
         con.execute("""
             CREATE TABLE IF NOT EXISTS incidents (
                 id             TEXT PRIMARY KEY,
@@ -392,6 +399,77 @@ def render_diagnosis(dx: dict, parsed) -> str:
 ---
 *EII CRAG Pipeline — {datetime.now().strftime('%d/%m/%Y %H:%M')} — eSocial KB v1.0*
 """
+
+
+def run_batch(files, max_workers):
+    """Generator: yields (log_str, dataframe_rows) as each XML completes."""
+    if not files:
+        yield "⚠️ Nenhum arquivo carregado.", []
+        return
+
+    file_list = files if isinstance(files, list) else [files]
+    xml_list: list[str] = []
+
+    for f in file_list:
+        # Gradio 4.x may give a dict, a NamedString, or a plain path string
+        if isinstance(f, dict):
+            path = f.get("name") or f.get("path") or str(f)
+        else:
+            path = f.name if hasattr(f, "name") else str(f)
+
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                content = fh.read().strip()
+        except Exception as exc:
+            yield f"❌ Erro ao ler arquivo '{path}': {exc}", []
+            return
+
+        if path.lower().endswith(".txt"):
+            # .txt: each non-empty line is one compact XML
+            xml_list.extend(line.strip() for line in content.splitlines() if line.strip())
+        else:
+            # .xml: whole file is one XML
+            if content:
+                xml_list.append(content)
+
+    if not xml_list:
+        yield "⚠️ Nenhum XML encontrado nos arquivos carregados.", []
+        return
+
+    n = len(xml_list)
+    workers = max(1, min(5, int(max_workers)))
+    log_lines = [f"📦 {n} XML(s) identificados | Workers: {workers} | Iniciando...\n"]
+    yield "\n".join(log_lines), []
+
+    rows: list[list] = []
+    for done, partial in batch_analyze_streaming(xml_list, max_workers=workers,
+                                                 collection=COLLECTION):
+        # partial has None for items not yet complete — find the one just finished
+        completed_items = [r for r in partial if r is not None]
+        last = completed_items[-1] if completed_items else {}
+        icon = "✅" if last.get("status") == "OK" else "❌"
+        log_lines.append(
+            f"  {icon} [{done}/{n}] {last.get('incident_id','—')} "
+            f"— {last.get('codigo_erro','—')} "
+            f"— sev={last.get('severidade','—')} "
+            f"— {last.get('status','—')}"
+        )
+        rows = [
+            [
+                r["incident_id"], r["evento"], r["codigo_erro"],
+                r["severidade"], r["confianca"], r["fonte"],
+                r["status"], r["elapsed_s"],
+            ]
+            for r in completed_items
+        ]
+        yield "\n".join(log_lines), rows
+
+    ok  = sum(1 for r in rows if r[6] == "OK")
+    err = n - ok
+    log_lines.append(
+        f"\n✅ Lote concluído — {ok} OK · {err} ERROR · total {n} XMLs"
+    )
+    yield "\n".join(log_lines), rows
 
 
 def render_placeholder() -> str:
@@ -759,7 +837,48 @@ with gr.Blocks(
             refresh_btn = gr.Button("🔄 Atualizar Log", size="sm")
             audit_md = gr.Markdown("*Nenhuma resolução registrada ainda.*")
 
-        # ── TAB 4: ARQUITETURA ────────────────────────────────────────────────
+        # ── TAB 4: LOTE ───────────────────────────────────────────────────────
+        with gr.Tab("📦 Lote"):
+            gr.Markdown(
+                "### Processamento em Lote\n"
+                "*Analise múltiplos XMLs em paralelo. "
+                "Carregue arquivos `.xml` (um por arquivo) "
+                "ou `.txt` (um XML compacto por linha).*"
+            )
+            with gr.Row(equal_height=False):
+                with gr.Column(scale=1, min_width=300):
+                    batch_files = gr.File(
+                        label="XMLs para análise (.xml ou .txt)",
+                        file_count="multiple",
+                        file_types=[".xml", ".txt"],
+                    )
+                    batch_workers = gr.Slider(
+                        minimum=1, maximum=5, value=3, step=1,
+                        label="Workers paralelos",
+                        interactive=True,
+                    )
+                    batch_btn = gr.Button(
+                        "📦 Processar Lote",
+                        variant="primary",
+                        size="lg",
+                        elem_classes=["btn-primary"],
+                    )
+                with gr.Column(scale=2):
+                    batch_log = gr.Textbox(
+                        label="Log de progresso",
+                        lines=10,
+                        interactive=False,
+                        show_copy_button=True,
+                    )
+            batch_df = gr.Dataframe(
+                headers=["ID", "Evento", "Código", "Severidade",
+                         "Confiança", "Fonte", "Status", "Tempo(s)"],
+                datatype=["str", "str", "str", "str", "str", "str", "str", "number"],
+                label="Resultados do Lote",
+                wrap=True,
+            )
+
+        # ── TAB 5: ARQUITETURA ────────────────────────────────────────────────
         with gr.Tab("🏗️ Arquitetura"):
             gr.Markdown("""
 ## EII — Arquitetura
@@ -861,6 +980,12 @@ O HITL é uma decisão de design — não uma limitação técnica.
     )
 
     refresh_btn.click(fn=render_audit_log, outputs=[audit_md])
+
+    batch_btn.click(
+        fn=run_batch,
+        inputs=[batch_files, batch_workers],
+        outputs=[batch_log, batch_df],
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

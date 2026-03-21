@@ -1,0 +1,43 @@
+{
+  "name": "EII — Incident Intelligence",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+
+  // Instala dependências logo após a criação do container
+  "postCreateCommand": "pip install -r requirements.txt && pip install fastmcp pytest",
+
+  // Variáveis de ambiente esperadas (valores configurados via Codespace Secrets)
+  "remoteEnv": {
+    "GROQ_API_KEY": "${localEnv:GROQ_API_KEY}",
+    "DB_PATH": "${localEnv:DB_PATH}",
+    "LANGFUSE_PUBLIC_KEY": "${localEnv:LANGFUSE_PUBLIC_KEY}",
+    "LANGFUSE_SECRET_KEY": "${localEnv:LANGFUSE_SECRET_KEY}",
+    "LANGFUSE_BASE_URL": "${localEnv:LANGFUSE_BASE_URL}"
+  },
+
+  // Porta padrão do Gradio
+  "forwardPorts": [7860],
+  "portsAttributes": {
+    "7860": {
+      "label": "Gradio App",
+      "onAutoForward": "openPreview"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.pylance",
+        "ms-toolsai.jupyter",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "editor.formatOnSave": true,
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.python"
+        }
+      }
+    }
+  }
+}

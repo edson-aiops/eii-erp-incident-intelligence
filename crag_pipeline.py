@@ -36,7 +36,8 @@ def build_vector_store() -> chromadb.Collection:
             f"Título: {item['titulo']}\n"
             f"Descrição: {item['descricao']}\n"
             f"Causa Raiz: {item['causa_raiz']}\n"
-            f"Tags: {', '.join(item['tags'])}"
+            f"Tags: {', '.join(item['tags'])}\n"
+            f"Passos: {'; '.join(item['passos_resolucao'])}"
         )
         docs.append(scrub_pii(doc))
         ids.append(item["id"])

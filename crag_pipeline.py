@@ -189,6 +189,10 @@ def retrieve(col: chromadb.Collection, query: str, n: int = 5,
         from ragflow_client import retrieve_ragflow
         return retrieve_ragflow(query=query, n=n)
 
+    if effective_backend == "qdrant":
+        from qdrant_client import retrieve_qdrant
+        return retrieve_qdrant(query=query, n=n)
+
     # ── ChromaDB path (default) ───────────────────────────────────────────────
     results = col.query(query_texts=[query], n_results=min(n, len(KB)))
     docs = []

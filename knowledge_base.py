@@ -1087,4 +1087,148 @@ KB = [
         "impacto": "médio",
         "tags": ["S-1070", "E602", "processo judicial", "tpProc", "CNJ", "decisão", "administrativo", "indDecisao"]
     },
+
+    # ──────────────────────────────────────────────────────
+    # BLOCO H — EXPANSÃO PRIORITÁRIA (KB054–KB060)
+    # ──────────────────────────────────────────────────────
+    {
+        "id": "KB054",
+        "evento": "S-2399",
+        "codigo_erro": "E312",
+        "titulo": "Encerramento de TSVE sem período de atividade ativo no eSocial",
+        "descricao": "S-2399 (Trabalhador Sem Vínculo de Emprego — Término) rejeitado com E312. O eSocial não localiza um S-2300 (TSVE — Início) ativo para o CPF e CNPJ informados, tornando o encerramento inválido por ausência de registro de atividade anterior.",
+        "causa_raiz": "O S-2399 é o evento de encerramento do período de atividade de trabalhador sem vínculo (autônomo, contribuinte individual, cooperado, estagiário). Para ser aceito, deve existir um S-2300 ativo correspondente ao mesmo CPF e empregador. O erro E312 ocorre quando: o S-2300 nunca foi enviado, foi excluído via S-3000, está em status de rejeição na plataforma, ou o CPF informado no S-2399 diverge do CPF do S-2300 original.",
+        "passos_resolucao": [
+            "Consultar o CPF do trabalhador na plataforma eSocial para verificar se existe S-2300 ativo para o empregador",
+            "Se nenhum S-2300 existir: enviar o S-2300 com a data de início da atividade do trabalhador antes de transmitir o S-2399",
+            "Se o S-2300 foi excluído indevidamente via S-3000: reenviar o S-2300 com os dados originais corretos",
+            "Verificar que o CPF no S-2399 é idêntico ao CPF usado no S-2300 correspondente",
+            "Aguardar o processamento e confirmação do S-2300 (cdResposta=201) antes de retransmitir o S-2399",
+            "Retransmitir o S-2399 com a data de término correta após confirmação do S-2300 ativo"
+        ],
+        "validacao": "Confirmar S-2300 ativo na plataforma eSocial antes de reenviar. Após envio do S-2399, verificar que o período de atividade do trabalhador está encerrado na plataforma com cdResposta=201.",
+        "tempo_estimado": "3-5h",
+        "impacto": "alto",
+        "tags": ["S-2399", "E312", "TSVE", "autônomo", "S-2300", "término", "contribuinte individual", "cpfTrab"]
+    },
+    {
+        "id": "KB055",
+        "evento": "S-2399",
+        "codigo_erro": "E460",
+        "titulo": "CPF do trabalhador autônomo inválido ou irregular no encerramento S-2399",
+        "descricao": "S-2399 (Trabalhador Sem Vínculo de Emprego — Término) rejeitado com E460. O CPF do trabalhador sem vínculo informado no evento de encerramento não está cadastrado na Receita Federal ou encontra-se em situação irregular, impedindo o processamento do término de atividade.",
+        "causa_raiz": "O eSocial valida o CPF em tempo real contra a base da RFB em todos os eventos que declaram trabalhadores. No S-2399, o CPF informado pode ter sido alterado em relação ao S-2300 original (erro de digitação no encerramento), o trabalhador pode ter regularizado o CPF após o início mas com número diferente, ou o CPF pode estar em situação irregular na RFB por cancelamento ou pendência de regularização.",
+        "passos_resolucao": [
+            "Consultar a situação do CPF na RFB: https://servicos.receita.fazenda.gov.br/servicos/cpf/consultasituacao/consultapublica.asp",
+            "Comparar o CPF informado no S-2399 com o CPF registrado no S-2300 correspondente na plataforma eSocial",
+            "Se houver divergência de CPF: corrigir o campo cpfTrab no S-2399 para o CPF exato do S-2300",
+            "Se CPF em situação irregular: orientar o trabalhador a regularizar junto à RFB antes do encerramento",
+            "Retransmitir o S-2399 somente após confirmar CPF com situação 'Regular' na RFB e idêntico ao S-2300"
+        ],
+        "validacao": "Confirmar situação 'Regular' do CPF na RFB e que o CPF é idêntico ao do S-2300 ativo. S-2399 aceito com cdResposta=201.",
+        "tempo_estimado": "Variável — depende da regularização do trabalhador",
+        "impacto": "alto",
+        "tags": ["S-2399", "E460", "CPF", "RFB", "autônomo", "TSVE", "contribuinte individual", "cpfTrab", "irregular"]
+    },
+    {
+        "id": "KB056",
+        "evento": "S-2410",
+        "codigo_erro": "E312",
+        "titulo": "Encerramento de benefício INSS sem S-2400 ativo no eSocial",
+        "descricao": "S-2410 (Cadastro de Beneficiário — Fim do Benefício) rejeitado com E312. O eSocial não localiza um S-2400 (Cadastro de Beneficiário — Início do Benefício) ativo para o CPF do beneficiário e o empregador informados, tornando o encerramento inválido.",
+        "causa_raiz": "O S-2410 encerra o período de gozo de benefício previdenciário declarado via S-2400. O E312 ocorre quando: o S-2400 de início nunca foi transmitido ou foi rejeitado, o S-2400 foi excluído via S-3000, o CPF do beneficiário no S-2410 diverge do CPF no S-2400, ou o tipo de benefício (codBenef) no S-2410 não corresponde ao tipo cadastrado no S-2400 ativo. O eSocial exige correspondência exata entre início e fim de benefício.",
+        "passos_resolucao": [
+            "Consultar os benefícios ativos do CPF na plataforma eSocial para o empregador",
+            "Verificar se existe S-2400 ativo com o mesmo codBenef que se deseja encerrar",
+            "Se o S-2400 não existir: enviar o S-2400 com os dados do início do benefício antes de transmitir o S-2410",
+            "Confirmar que o CPF do beneficiário no S-2410 é idêntico ao CPF no S-2400 correspondente",
+            "Confirmar que o codBenef no S-2410 corresponde exatamente ao codBenef do S-2400 ativo",
+            "Retransmitir o S-2410 somente após confirmação do S-2400 ativo e dados consistentes"
+        ],
+        "validacao": "Verificar na plataforma que o S-2400 está ativo antes do envio. Após o S-2410, confirmar que o benefício aparece como encerrado com cdResposta=201.",
+        "tempo_estimado": "3-4h",
+        "impacto": "alto",
+        "tags": ["S-2410", "E312", "benefício", "INSS", "S-2400", "encerramento", "codBenef", "beneficiário", "dtFimBenef"]
+    },
+    {
+        "id": "KB057",
+        "evento": "S-2210",
+        "codigo_erro": "E312",
+        "titulo": "CAT rejeitada — trabalhador acidentado sem vínculo ativo no eSocial",
+        "descricao": "S-2210 (Comunicação de Acidente de Trabalho) rejeitado com E312. O eSocial não localiza vínculo empregatício ativo para o CPF do trabalhador acidentado no empregador informado, tornando a CAT inválida por ausência de registro de admissão correspondente.",
+        "causa_raiz": "A CAT só pode ser registrada para trabalhadores com vínculo ativo no eSocial. O E312 no S-2210 ocorre quando: o S-2200 (admissão) do trabalhador nunca foi enviado ou foi rejeitado, o trabalhador foi desligado via S-2299 antes do registro da CAT, o S-2200 foi excluído indevidamente, ou o CPF informado no S-2210 diverge do CPF registrado no S-2200. Este erro é especialmente crítico pois atrasa o registro previdenciário do acidente junto ao INSS.",
+        "passos_resolucao": [
+            "Consultar o CPF do trabalhador na plataforma eSocial e verificar a situação do vínculo empregatício",
+            "Se não existir S-2200 ativo: enviar o S-2200 com a data de admissão real do trabalhador com urgência",
+            "Se o S-2200 existir mas estiver rejeitado: corrigir e reenviar o S-2200 antes da CAT",
+            "Verificar que o CPF no S-2210 é idêntico ao CPF registrado no S-2200 ativo",
+            "Aguardar processamento e confirmação do S-2200 (cdResposta=201) antes de retransmitir o S-2210",
+            "Retransmitir o S-2210 imediatamente após confirmação do vínculo — prazo CAT é 1 dia útil após o acidente",
+            "Verificar pendências com o INSS caso o prazo de registro da CAT tenha sido ultrapassado"
+        ],
+        "validacao": "Confirmar vínculo ativo do trabalhador na plataforma antes de reenviar o S-2210. CAT aceita com cdResposta=201 e registro gerado no INSS.",
+        "tempo_estimado": "2-4h (urgente — prazo legal de 1 dia útil)",
+        "impacto": "crítico",
+        "tags": ["S-2210", "E312", "CAT", "acidente trabalho", "vínculo", "S-2200", "INSS", "cpfTrab", "prazo legal"]
+    },
+    {
+        "id": "KB058",
+        "evento": "S-2210",
+        "codigo_erro": "E460",
+        "titulo": "CPF do trabalhador acidentado inválido ou irregular na CAT S-2210",
+        "descricao": "S-2210 (Comunicação de Acidente de Trabalho) rejeitado com E460. O CPF do trabalhador acidentado informado no evento não está cadastrado na Receita Federal ou encontra-se em situação irregular, impedindo o registro da CAT e do acidente junto ao INSS.",
+        "causa_raiz": "O eSocial valida o CPF de todo trabalhador declarado em eventos de saúde e segurança do trabalho contra a base da RFB. No contexto do S-2210, o CPF pode estar incorreto por erro de digitação no momento do acidente, o trabalhador pode ser estrangeiro sem CPF brasileiro regularizado, ou o CPF pode estar em situação 'Pendente de Regularização' na RFB. A urgência é maior pois a CAT tem prazo legal de 1 dia útil.",
+        "passos_resolucao": [
+            "Verificar imediatamente o CPF correto do trabalhador nos documentos de admissão (CTPS, contrato, ficha de registro)",
+            "Consultar a situação do CPF na RFB: https://servicos.receita.fazenda.gov.br/servicos/cpf/consultasituacao/consultapublica.asp",
+            "Comparar o CPF do S-2210 com o CPF registrado no S-2200 (admissão) do trabalhador na plataforma eSocial",
+            "Se houver erro de digitação: corrigir o cpfTrab no S-2210 e retransmitir",
+            "Se CPF irregular: iniciar processo emergencial de regularização junto à RFB e documentar o ocorrido para fins de prazo legal",
+            "Retransmitir o S-2210 assim que o CPF estiver regular e correto"
+        ],
+        "validacao": "Confirmar CPF com situação 'Regular' na RFB e idêntico ao do S-2200. S-2210 aceito com cdResposta=201 e CAT registrada.",
+        "tempo_estimado": "1-3h (urgente — prazo legal de 1 dia útil para CAT)",
+        "impacto": "crítico",
+        "tags": ["S-2210", "E460", "CAT", "CPF", "RFB", "acidente trabalho", "cpfTrab", "INSS", "prazo legal"]
+    },
+    {
+        "id": "KB059",
+        "evento": "S-1200",
+        "codigo_erro": "E430",
+        "titulo": "S-1200 duplicado para a competência — reenvio indevido após timeout",
+        "descricao": "S-1200 (Remuneração do Trabalhador) rejeitado com E430. Já existe um S-1200 processado com sucesso para o mesmo trabalhador (mesmo CPF) e a mesma competência (perApur) no eSocial, caracterizando duplicidade. Ocorre tipicamente quando o sistema de folha reenvia automaticamente após um timeout sem verificar se o envio anterior já foi aceito.",
+        "causa_raiz": "O E430 no S-1200 indica que o eSocial já possui um evento de remuneração aceito (cdResposta=201) para o par CPF/perApur. As causas mais comuns são: sistema de retry enviou o S-1200 múltiplas vezes após timeout do webservice sem checar o retorno anterior; operador retransmitiu manualmente sem consultar a plataforma; ou o sistema de integração não persistiu o nrRec do aceite anterior e gerou novo envio na próxima janela. Este erro é distinto do E428 (que trata de retificação incorreta).",
+        "passos_resolucao": [
+            "Consultar o S-1200 já aceito na plataforma eSocial para o trabalhador e a competência: verificar o nrRec do evento processado",
+            "Confirmar que o S-1200 original está com cdResposta=201 e os valores de remuneração corretos",
+            "Se os valores do S-1200 original estiverem corretos: nenhuma ação adicional é necessária — descartar o reenvio",
+            "Se os valores precisarem de correção: usar o S-1200 com indRetif=2 e nrRecEvt com o nrRec do evento aceito (retificação), não reenviar como original",
+            "Revisar o sistema de transmissão para implementar verificação de status antes de reenviar (consultar nrRec antes de retransmitir)",
+            "Implementar persistência do nrRec de aceite para evitar reenvios após timeout"
+        ],
+        "validacao": "Confirmar na plataforma que o S-1200 original está processado com os valores corretos. Para correções de valor, confirmar aceite do S-1200 retificado (indRetif=2) com cdResposta=201.",
+        "tempo_estimado": "1-2h",
+        "impacto": "médio",
+        "tags": ["S-1200", "E430", "duplicata", "remuneração", "perApur", "timeout", "retry", "nrRec", "reenvio"]
+    },
+    {
+        "id": "KB060",
+        "evento": "S-2299",
+        "codigo_erro": "E529",
+        "titulo": "Motivo de desligamento incompatível com a categoria do trabalhador",
+        "descricao": "S-2299 (Desligamento) rejeitado com E529. O código do motivo de desligamento (mtvDeslig) informado é incompatível com a categoria do trabalhador (codCateg), o tipo de regime de trabalho (tpRegTrab), ou outros atributos do vínculo declarados no S-2200 correspondente.",
+        "causa_raiz": "O eSocial define regras de compatibilidade entre motivos de desligamento e categorias de trabalhadores. Exemplos frequentes: motivo '01' (rescisão sem justa causa) não é válido para estagiários (categoria 901) que devem usar motivo '12' (término de contrato de estágio); trabalhadores domésticos têm motivos específicos distintos dos CLT; servidores públicos (regime estatutário) não podem usar motivos de rescisão da CLT; motivo de aposentadoria exige confirmação de benefício INSS ativo. A incompatibilidade entre mtvDeslig e codCateg é a principal causa de E529 no S-2299.",
+        "passos_resolucao": [
+            "Consultar a tabela de motivos de desligamento (Tabela 19) na documentação técnica do eSocial e verificar os motivos válidos para a categoria do trabalhador",
+            "Identificar a categoria (codCateg) registrada no S-2200 do trabalhador",
+            "Verificar qual código mtvDeslig é compatível com a categoria: ex. categoria 901 (estagiário) → motivo 12; categoria 10x (doméstico) → motivos específicos de doméstico",
+            "Corrigir o campo mtvDeslig no XML do S-2299 com o código compatível com a categoria",
+            "Para desligamentos por aposentadoria: confirmar se há benefício INSS ativo e usar o motivo correto conforme o tipo de aposentadoria",
+            "Retransmitir o S-2299 com o motivo de desligamento correto"
+        ],
+        "validacao": "Confirmar que o mtvDeslig é compatível com a codCateg do S-2200 correspondente. S-2299 aceito com cdResposta=201 e vínculo encerrado na plataforma.",
+        "tempo_estimado": "2h",
+        "impacto": "alto",
+        "tags": ["S-2299", "E529", "desligamento", "mtvDeslig", "categoria", "codCateg", "estagiário", "CLT", "tpRegTrab"]
+    },
 ]

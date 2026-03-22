@@ -401,39 +401,18 @@ def render_diagnosis(dx: dict, parsed) -> str:
 """
 
 
-def run_batch(files, max_workers):
+def run_batch(xml_text, max_workers):
     """Generator: yields (log_str, dataframe_rows) as each XML completes."""
-    if not files:
-        yield "⚠️ Nenhum arquivo carregado.", []
+    if not xml_text or not xml_text.strip():
+        yield "⚠️ Nenhum XML colado.", []
         return
 
-    file_list = files if isinstance(files, list) else [files]
-    xml_list: list[str] = []
-
-    for f in file_list:
-        # Gradio 4.x may give a dict, a NamedString, or a plain path string
-        if isinstance(f, dict):
-            path = f.get("name") or f.get("path") or str(f)
-        else:
-            path = f.name if hasattr(f, "name") else str(f)
-
-        try:
-            with open(path, encoding="utf-8", errors="replace") as fh:
-                content = fh.read().strip()
-        except Exception as exc:
-            yield f"❌ Erro ao ler arquivo '{path}': {exc}", []
-            return
-
-        if path.lower().endswith(".txt"):
-            # .txt: each non-empty line is one compact XML
-            xml_list.extend(line.strip() for line in content.splitlines() if line.strip())
-        else:
-            # .xml: whole file is one XML
-            if content:
-                xml_list.append(content)
+    # Split on blank lines — each block is one XML document
+    blocks = [b.strip() for b in xml_text.split("\n\n") if b.strip()]
+    xml_list = [b for b in blocks if b.startswith("<")]
 
     if not xml_list:
-        yield "⚠️ Nenhum XML encontrado nos arquivos carregados.", []
+        yield "⚠️ Nenhum XML encontrado. Separe os XMLs com uma linha em branco.", []
         return
 
     n = len(xml_list)
@@ -842,15 +821,14 @@ with gr.Blocks(
             gr.Markdown(
                 "### Processamento em Lote\n"
                 "*Analise múltiplos XMLs em paralelo. "
-                "Carregue arquivos `.xml` (um por arquivo) "
-                "ou `.txt` (um XML compacto por linha).*"
+                "Cole os XMLs na caixa abaixo, separando cada um com uma linha em branco.*"
             )
             with gr.Row(equal_height=False):
                 with gr.Column(scale=1, min_width=300):
-                    batch_files = gr.File(
-                        label="XMLs para análise (.xml ou .txt)",
-                        file_count="multiple",
-                        file_types=[".xml", ".txt"],
+                    batch_files = gr.Textbox(
+                        label="XMLs para análise (cole um ou mais, separados por linha em branco)",
+                        lines=10,
+                        placeholder="<?xml version=\"1.0\"?>\n<eSocial>...</eSocial>\n\n<?xml version=\"1.0\"?>\n<eSocial>...</eSocial>",
                     )
                     batch_workers = gr.Slider(
                         minimum=1, maximum=5, value=3, step=1,

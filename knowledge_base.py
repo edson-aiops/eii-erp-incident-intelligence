@@ -1231,4 +1231,206 @@ KB = [
         "impacto": "alto",
         "tags": ["S-2299", "E529", "desligamento", "mtvDeslig", "categoria", "codCateg", "estagiário", "CLT", "tpRegTrab"]
     },
+
+    # ──────────────────────────────────────────────────────
+    # ERROS DE ALTERAÇÃO CONTRATUAL / TABELAS
+    # ──────────────────────────────────────────────────────
+    {
+        "id": "KB061",
+        "evento": "S-2206",
+        "codigo_erro": "E529",
+        "titulo": "Tipo de salário ou jornada incompatível com a categoria na alteração contratual S-2206",
+        "descricao": "S-2206 (Alteração de Contrato de Trabalho) rejeitado com E529. Os campos de remuneração (tpSalFx, vrSalFx) ou jornada (qtdHrsSem, tpJornada) informados na alteração contratual são incompatíveis com a categoria do trabalhador (codCateg) registrada no S-2200 original ou com o tipo de regime de trabalho declarado.",
+        "causa_raiz": "O eSocial aplica regras de compatibilidade entre tipo de salário/jornada e categoria do trabalhador no evento S-2206. Exemplos frequentes: tentar aplicar salário por hora (tpSalFx=2) a um trabalhador mensalista sem alterar corretamente o tpRegJor; informar qtdHrsSem acima de 44h para categorias com regime especial de jornada; usar tpJornada incompatível com codCateg (ex: jornada de tempo parcial para categoria que exige tempo integral); ou alterar tpSalFx para valor que contradiz a categoria do vínculo estabelecida no S-2200. A tabela de compatibilidades está definida nos leiautes do eSocial e é validada no momento do processamento.",
+        "passos_resolucao": [
+            "Identificar os campos rejeitados consultando a mensagem de erro E529 no retorno do eSocial (campo localizacaoErro)",
+            "Consultar a Tabela de Categorias do eSocial e verificar as restrições de tpSalFx e tpJornada para a codCateg do trabalhador",
+            "Verificar o S-2200 original do trabalhador para confirmar a categoria e o regime de trabalho registrados",
+            "Corrigir os campos incompatíveis no S-2206: alinhar tpSalFx, vrSalFx, qtdHrsSem e tpJornada com as regras da categoria",
+            "Se a categoria precisar ser alterada: verificar se o eSocial permite a mudança de categoria via S-2206 ou se é necessário desligamento e nova admissão",
+            "Retransmitir o S-2206 com os dados corrigidos e compatíveis com a categoria do trabalhador"
+        ],
+        "validacao": "Confirmar S-2206 aceito com cdResposta=201. Verificar na plataforma eSocial que os dados contratuais alterados estão refletidos corretamente no histórico do vínculo.",
+        "tempo_estimado": "2-3h",
+        "impacto": "médio",
+        "tags": ["S-2206", "E529", "alteração contratual", "tpSalFx", "jornada", "qtdHrsSem", "categoria", "codCateg", "tpJornada"]
+    },
+    {
+        "id": "KB062",
+        "evento": "S-2206",
+        "codigo_erro": "E601",
+        "titulo": "Data de alteração contratual S-2206 fora da janela de transmissão permitida",
+        "descricao": "S-2206 (Alteração de Contrato de Trabalho) rejeitado com E601. A data de alteração contratual informada no campo dtAlt está fora da janela de transmissão aceita pelo eSocial, seja por ser anterior ao prazo mínimo retroativo permitido ou por ser futura em relação à data de transmissão.",
+        "causa_raiz": "O eSocial impõe janelas de transmissão para eventos não periódicos como o S-2206. O E601 ocorre quando: a data da alteração contratual (dtAlt) é anterior ao limite retroativo definido pelo eSocial para o grupo de empregadores (geralmente vinculado ao início da obrigatoriedade); a data é futura por erro de digitação no campo (ex: ano 2026 em vez de 2025); ou a alteração refere-se a um período cuja folha já foi fechada via S-1299 sem que a mudança contratual tenha sido registrada antes do fechamento. A janela de retroatividade varia por grupo de empregadores conforme o cronograma do eSocial.",
+        "passos_resolucao": [
+            "Verificar a data correta da alteração contratual nos documentos internos (aditivo contratual, acordo coletivo, decisão judicial)",
+            "Confirmar a data de transmissão atual e verificar se a dtAlt não está no futuro por erro de digitação",
+            "Consultar o calendário de obrigatoriedades do eSocial para o grupo do empregador e verificar a data de início que limita a retroatividade",
+            "Se a data for retroativa além do limite: contatar o e-CAC da RFB para orientação sobre envio extemporâneo",
+            "Se a data for futura por erro de digitação: corrigir o campo dtAlt no XML com a data real da alteração",
+            "Retransmitir o S-2206 com a dtAlt correta e dentro da janela de transmissão"
+        ],
+        "validacao": "Confirmar S-2206 aceito com cdResposta=201 e data de alteração registrada corretamente no histórico do vínculo na plataforma eSocial.",
+        "tempo_estimado": "1-2h (variável se exigir contato com RFB para retroativo)",
+        "impacto": "médio",
+        "tags": ["S-2206", "E601", "alteração contratual", "dtAlt", "janela transmissão", "retroativo", "prazo", "data futura"]
+    },
+
+    # ──────────────────────────────────────────────────────
+    # ERROS DE PAGAMENTO / BENEFÍCIO
+    # ──────────────────────────────────────────────────────
+    {
+        "id": "KB063",
+        "evento": "S-4000",
+        "codigo_erro": "E312",
+        "titulo": "S-4000 rejeitado — pagamento a beneficiário sem evento de remuneração correspondente",
+        "descricao": "S-4000 (Informações de Pagamentos a Beneficiários) rejeitado com E312. O eSocial não localiza um evento de remuneração previamente aceito (S-1200, S-1202 ou verbas rescisórias do S-2299) que fundamente o pagamento declarado no S-4000 para o CPF do beneficiário e a competência informados.",
+        "causa_raiz": "O S-4000 é um evento de pagamento que deve obrigatoriamente corresponder a eventos de remuneração já aceitos na plataforma eSocial. O E312 ocorre quando: o S-1200 ou S-1202 correspondente ao pagamento não foi transmitido ou está com erro; a competência (perApur) do S-4000 diverge da competência do evento de remuneração; o CPF do beneficiário no S-4000 não coincide com o CPF do evento de remuneração processado; ou o empregador tenta declarar pagamentos por serviços autônomos sem o correspondente S-2300 ativo e S-1202 aceito. O eSocial exige rastreabilidade entre pagamento e remuneração declarada.",
+        "passos_resolucao": [
+            "Consultar na plataforma eSocial os eventos de remuneração (S-1200, S-1202) aceitos para o CPF do beneficiário e a competência informada no S-4000",
+            "Verificar se o S-1200 ou S-1202 correspondente está processado com cdResposta=201",
+            "Se o evento de remuneração não existir: enviar o S-1200 (empregado CLT) ou S-1202 (TSVE/autônomo) antes de retransmitir o S-4000",
+            "Confirmar que o CPF do beneficiário e a competência no S-4000 são idênticos aos do evento de remuneração correspondente",
+            "Para pagamentos de trabalhadores autônomos: verificar se o S-2300 está ativo e se o S-1202 foi enviado para a competência",
+            "Retransmitir o S-4000 somente após confirmação do evento de remuneração correspondente aceito"
+        ],
+        "validacao": "Verificar que existe S-1200 ou S-1202 aceito (cdResposta=201) para o mesmo CPF e competência antes de reenviar. S-4000 aceito com cdResposta=201 e retenção de IR/INSS calculada.",
+        "tempo_estimado": "3-4h",
+        "impacto": "alto",
+        "tags": ["S-4000", "E312", "pagamento", "S-1200", "S-1202", "remuneração", "beneficiário", "competência", "autônomo"]
+    },
+    {
+        "id": "KB064",
+        "evento": "S-2400",
+        "codigo_erro": "E350",
+        "titulo": "Data de início do benefício INSS anterior ao afastamento registrado no S-2230",
+        "descricao": "S-2400 (Cadastro de Beneficiário — Início do Benefício) rejeitado com E350. A data de início do benefício previdenciário (dtIniBenef) informada é anterior à data de início do afastamento (dtIniAfast) registrado no S-2230 para o mesmo trabalhador, criando inconsistência temporal no histórico do vínculo.",
+        "causa_raiz": "O eSocial valida a consistência temporal entre eventos relacionados ao mesmo trabalhador. Para benefícios previdenciários por incapacidade (auxílio-doença, aposentadoria por invalidez), a lógica exige que o afastamento declarado no S-2230 seja anterior ou contemporâneo ao início do benefício no S-2400. O E350 ocorre quando: a data do afastamento no S-2230 foi lançada incorretamente como posterior ao início do benefício; o S-2230 foi enviado com data errada; o benefício foi concedido retroativamente pelo INSS a uma data anterior ao afastamento declarado; ou o S-2400 está sendo enviado sem que o S-2230 correspondente tenha sido previamente transmitido e aceito.",
+        "passos_resolucao": [
+            "Consultar o S-2230 ativo do trabalhador na plataforma eSocial e verificar a dtIniAfast registrada",
+            "Verificar a Carta de Concessão do benefício pelo INSS para confirmar a data real de início (dtIniBenef)",
+            "Se o S-2230 tiver data incorreta: retificar o S-2230 com a dtIniAfast correta antes de retransmitir o S-2400",
+            "Se não houver S-2230: enviar o S-2230 com a data de início do afastamento antes de transmitir o S-2400",
+            "Garantir que a dtIniAfast do S-2230 seja igual ou anterior à dtIniBenef do S-2400",
+            "Retransmitir o S-2400 após confirmação do S-2230 com datas consistentes e aceito (cdResposta=201)"
+        ],
+        "validacao": "Verificar que S-2230 está aceito com dtIniAfast ≤ dtIniBenef do S-2400. S-2400 aceito com cdResposta=201 e benefício registrado com a data correta na plataforma.",
+        "tempo_estimado": "2-3h",
+        "impacto": "alto",
+        "tags": ["S-2400", "E350", "benefício INSS", "afastamento", "S-2230", "dtIniBenef", "dtIniAfast", "auxílio-doença", "aposentadoria"]
+    },
+
+    # ──────────────────────────────────────────────────────
+    # ERROS DE TABELAS DE EMPREGADOR
+    # ──────────────────────────────────────────────────────
+    {
+        "id": "KB065",
+        "evento": "S-1050",
+        "codigo_erro": "E100",
+        "titulo": "Horário de trabalho já cadastrado — duplicata na tabela S-1050",
+        "descricao": "S-1050 (Tabela de Horários de Trabalho) rejeitado com E100. O código do horário de trabalho (codHorContrat) informado já existe na tabela do empregador na plataforma eSocial. O evento S-1050 está sendo enviado como novo (indRetif=1) mas o registro já foi previamente cadastrado, caracterizando duplicidade.",
+        "causa_raiz": "O S-1050 mantém a tabela de horários de trabalho do empregador no eSocial. O E100 ocorre porque: o codHorContrat informado já foi cadastrado em um S-1050 anterior aceito; o sistema de integração reenviou o S-1050 original após timeout sem verificar se o aceite anterior foi processado; houve tentativa de inclusão de novo horário reutilizando um código já existente; ou o operador criou um registro sem verificar os horários já cadastrados na plataforma. Para atualizar um horário já cadastrado, deve-se usar indRetif=2 (retificação) com o nrRecEvt do S-1050 original, nunca enviar um novo evento com o mesmo codHorContrat.",
+        "passos_resolucao": [
+            "Consultar a tabela de horários cadastrados na plataforma eSocial para identificar o S-1050 existente com o mesmo codHorContrat",
+            "Copiar o nrRec do S-1050 já aceito com o codHorContrat em questão",
+            "Se o objetivo for atualizar o horário: alterar o S-1050 para indRetif=2 e preencher nrRecEvt com o nrRec do evento original",
+            "Se o objetivo for criar um horário diferente: utilizar um codHorContrat ainda não cadastrado na tabela",
+            "Retransmitir o S-1050 como retificação (indRetif=2) ou com novo código de horário conforme o caso",
+            "Revisar o processo de geração de codHorContrat no sistema de integração para evitar duplicatas futuras"
+        ],
+        "validacao": "Confirmar S-1050 aceito com cdResposta=201. Verificar na tabela de horários da plataforma que o registro está atualizado ou que o novo código foi criado corretamente.",
+        "tempo_estimado": "1h",
+        "impacto": "baixo",
+        "tags": ["S-1050", "E100", "horário trabalho", "codHorContrat", "duplicata", "tabela", "indRetif", "nrRecEvt"]
+    },
+
+    # ──────────────────────────────────────────────────────
+    # ERROS DE TSVE (TRABALHADOR SEM VÍNCULO DE EMPREGO)
+    # ──────────────────────────────────────────────────────
+    {
+        "id": "KB066",
+        "evento": "S-2300",
+        "codigo_erro": "E312",
+        "titulo": "Alteração ou encerramento de TSVE rejeitado — S-2300 não encontrado para o autônomo",
+        "descricao": "Evento da família TSVE (S-2306 — Alteração dos Dados Cadastrais, ou S-2399 — Término) rejeitado com E312. O eSocial não localiza um S-2300 (TSVE — Início) ativo para o CPF do trabalhador autônomo e o empregador informados, tornando qualquer operação subsequente sobre esse trabalhador inválida.",
+        "causa_raiz": "O S-2300 é o evento que abre o período de atividade do Trabalhador Sem Vínculo de Emprego (autônomo, contribuinte individual, estagiário sem CLT). Sem um S-2300 ativo e aceito, nenhum evento de alteração cadastral (S-2306) ou encerramento (S-2399) pode ser processado. O E312 nesse contexto ocorre quando: o S-2300 nunca foi transmitido para esse trabalhador; o S-2300 foi enviado com CPF diferente do informado no S-2306/S-2399; o S-2300 foi excluído indevidamente via S-3000; ou o S-2306/S-2399 foi enviado antes do aceite do S-2300. Este cenário é complementar ao KB054, que cobre exclusivamente o S-2399, pois aqui a ausência de S-2300 impede também alterações cadastrais via S-2306.",
+        "passos_resolucao": [
+            "Consultar o CPF do trabalhador autônomo na plataforma eSocial e verificar se existe S-2300 ativo para o empregador",
+            "Se não existir S-2300 ativo: enviar o S-2300 com a data de início real da prestação de serviços do trabalhador",
+            "Verificar se houve exclusão indevida via S-3000 consultando o histórico de eventos do CPF na plataforma",
+            "Aguardar processamento e aceite do S-2300 (cdResposta=201) antes de tentar qualquer S-2306 ou S-2399",
+            "Confirmar que o CPF no S-2306/S-2399 é idêntico ao CPF registrado no S-2300 aceito",
+            "Retransmitir o S-2306 ou S-2399 somente após confirmação do S-2300 ativo na plataforma"
+        ],
+        "validacao": "Confirmar S-2300 aceito com cdResposta=201 e período de atividade TSVE ativo na plataforma. Reenvio do S-2306 ou S-2399 aceito com cdResposta=201.",
+        "tempo_estimado": "3-4h",
+        "impacto": "alto",
+        "tags": ["S-2300", "E312", "TSVE", "autônomo", "contribuinte individual", "S-2306", "S-2399", "cpfTrab", "período atividade"]
+    },
+
+    # ──────────────────────────────────────────────────────
+    # ERROS DE CONECTIVIDADE E CERTIFICADO
+    # ──────────────────────────────────────────────────────
+    {
+        "id": "KB067",
+        "evento": "Qualquer",
+        "codigo_erro": "E002",
+        "titulo": "Falha de conectividade SSL/TLS com o webservice eSocial",
+        "descricao": "Erro E002 na transmissão de lotes ao webservice do eSocial. O erro indica falha de handshake SSL/TLS na camada de transporte, impedindo o estabelecimento da conexão segura entre o middleware do empregador e o endpoint do governo. Nenhum evento é transmitido — o erro ocorre antes mesmo do processamento dos XMLs pelo servidor.",
+        "causa_raiz": "O E002 de conectividade SSL/TLS tem múltiplas causas na camada de rede e segurança: os certificados raiz da ICP-Brasil não estão instalados ou estão desatualizados no truststore do servidor de transmissão; a versão do protocolo TLS do middleware é incompatível com os requisitos do webservice (o governo exige TLS 1.2 ou superior, rejeitando TLS 1.0 e 1.1); o firewall corporativo bloqueia ou realiza inspeção SSL no tráfego HTTPS para os endpoints do eSocial; o proxy corporativo quebra o handshake mTLS; ou o certificado digital do empregador não está sendo apresentado corretamente na camada de transporte. Esta situação é distinta do E214 (certificado expirado) pois o E002 ocorre na camada de transporte, antes da validação do conteúdo XML.",
+        "passos_resolucao": [
+            "Verificar conectividade básica com o endpoint do eSocial usando curl ou ferramenta equivalente contra https://www.esocial.gov.br",
+            "Verificar se os certificados raiz da ICP-Brasil estão instalados e atualizados no truststore do servidor de transmissão",
+            "Confirmar que o middleware usa TLS 1.2 ou 1.3 — versões TLS 1.0 e 1.1 são rejeitadas pelo webservice do governo",
+            "Verificar as regras de firewall e proxy corporativo: os endpoints *.gov.br na porta 443 devem ter passagem direta sem inspeção SSL",
+            "Testar a transmissão fora da rede corporativa (ex: via hotspot 4G) para isolar se o problema é do ambiente de rede da empresa",
+            "Se o problema for no proxy: configurar exceção de SSL inspection para os domínios *.esocial.gov.br",
+            "Contatar o fornecedor do middleware se o problema persistir — pode exigir atualização da biblioteca SSL/TLS utilizada"
+        ],
+        "validacao": "Realizar transmissão de teste e confirmar conexão estabelecida sem E002. Verificar log de transmissão para confirmar handshake TLS bem-sucedido e evento aceito.",
+        "tempo_estimado": "2-4h (pode envolver equipe de redes e infraestrutura)",
+        "impacto": "crítico",
+        "tags": ["E002", "SSL", "TLS", "conectividade", "webservice", "firewall", "proxy", "ICP-Brasil", "handshake"]
+    },
+    {
+        "id": "KB068",
+        "evento": "Qualquer",
+        "codigo_erro": "E203",
+        "titulo": "CNPJ do empregador suspenso ou inapto na RFB — transmissão bloqueada",
+        "descricao": "Todos os eventos rejeitados com E203. O CNPJ do empregador informado no ideEmpregador está com situação cadastral irregular na Receita Federal do Brasil — suspenso, inapto, baixado ou cancelado — impedindo qualquer transmissão de eventos ao eSocial enquanto a irregularidade não for sanada junto à RFB.",
+        "causa_raiz": "O eSocial valida a situação cadastral do CNPJ do empregador antes de processar qualquer evento. O status 'suspenso' ocorre tipicamente por falta de entrega de declarações obrigatórias (DCTF, ECF, DEFIS, DASN); 'inapto' indica que o CNPJ não entregou obrigações acessórias por dois ou mais exercícios consecutivos; 'baixado' significa que o CNPJ foi encerrado formalmente. Em todos os casos, o eSocial bloqueia totalmente a transmissão até a regularização. Esta situação é diferente do E469 (CNPJ do estabelecimento inativo em vínculo específico) pois o E203 bloqueia o empregador principal e afeta todos os eventos sem distinção.",
+        "passos_resolucao": [
+            "Consultar a situação cadastral do CNPJ na RFB: https://servicos.receita.fazenda.gov.br/servicos/cnpjreva/Cnpjreva_Solicitacao.asp",
+            "Identificar o motivo da irregularidade: verificar obrigações acessórias pendentes no e-CAC (https://cav.receita.fazenda.gov.br)",
+            "Regularizar a situação: entregar as declarações em atraso (DCTF, ECF, DEFIS) ou retificar as irregularidades apontadas pela RFB",
+            "Para CNPJ 'suspenso': entregar as declarações pendentes e aguardar a atualização da situação pela RFB (pode levar 24-72h após entrega)",
+            "Para CNPJ 'inapto': além das declarações, pode ser necessário protocolo formal de reativação junto à RFB com acompanhamento de contabilista",
+            "Após regularização, confirmar nova situação como 'Ativa' na RFB antes de retransmitir os eventos pendentes"
+        ],
+        "validacao": "Confirmar CNPJ com situação 'Ativa' na consulta da RFB antes de retransmitir. Reenvio dos eventos aceito sem E203 após regularização.",
+        "tempo_estimado": "Variável — regularização da RFB pode levar de horas a dias",
+        "impacto": "crítico",
+        "tags": ["E203", "CNPJ", "RFB", "suspenso", "inapto", "situação cadastral", "empregador", "bloqueio transmissão", "e-CAC"]
+    },
+    {
+        "id": "KB069",
+        "evento": "Qualquer",
+        "codigo_erro": "E216",
+        "titulo": "Certificado digital A3 revogado pela AC — diferente de certificado expirado",
+        "descricao": "Eventos rejeitados com E216. O certificado digital A3 (hardware token ou smartcard) utilizado para assinar e transmitir os eventos foi revogado pela Autoridade Certificadora (AC) emissora antes do seu vencimento natural, tornando a assinatura digital inválida. Este erro é distinto do E214 (certificado expirado) pois a revogação é um ato deliberado da AC ou do titular, não decorrente do prazo de validade.",
+        "causa_raiz": "A revogação do certificado A3 é verificada em tempo real pelo eSocial via Lista de Certificados Revogados (LCR/CRL) ou protocolo OCSP da ICP-Brasil em cada transmissão. As causas mais comuns de revogação são: comprometimento ou suspeita de comprometimento da chave privada do token; solicitação do titular por perda ou roubo do dispositivo smartcard/token; mudança dos dados do titular (razão social, CNPJ) que exige emissão de novo certificado; ou revogação realizada pela AC por determinação judicial ou infração às políticas da ICP-Brasil. Uma vez revogado, o certificado não pode ser reativado — é obrigatória a emissão de novo certificado junto à AC.",
+        "passos_resolucao": [
+            "Confirmar a revogação consultando a CRL da AC emissora ou usando verificação OCSP com o número de série do certificado",
+            "Contatar a Autoridade Certificadora (ex: Serasa, Certisign, Valid, Soluti) para confirmar o motivo e a data da revogação",
+            "URGENTE: Se a revogação ocorreu por comprometimento de chave, fazer levantamento de todos os eventos assinados com o certificado revogado para avaliação de validade jurídica",
+            "Solicitar emissão de novo certificado A3 junto à AC — a revogação não pode ser desfeita, é necessário novo certificado",
+            "Instalar o novo certificado no dispositivo token/smartcard e configurar o middleware de transmissão com o novo certificado",
+            "Retransmitir os eventos pendentes com o novo certificado válido",
+            "Revisar o processo de custódia do token/smartcard e implementar controles de acesso para evitar recorrência"
+        ],
+        "validacao": "Verificar que o novo certificado está ativo e não revogado na CRL da AC emissora. Transmissão de evento de teste aceita sem E216 com o novo certificado.",
+        "tempo_estimado": "4-8h (emissão de novo certificado A3 depende do processo da AC)",
+        "impacto": "crítico",
+        "tags": ["E216", "certificado digital", "A3", "revogado", "CRL", "OCSP", "ICP-Brasil", "token", "smartcard"]
+    },
 ]

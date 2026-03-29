@@ -1433,4 +1433,104 @@ KB = [
         "impacto": "crítico",
         "tags": ["E216", "certificado digital", "A3", "revogado", "CRL", "OCSP", "ICP-Brasil", "token", "smartcard"]
     },
+
+    # ──────────────────────────────────────────────────────
+    # ERROS DE AFASTAMENTO / VÍNCULO (KB070)
+    # ──────────────────────────────────────────────────────
+    {
+        "id": "KB070",
+        "evento": "S-2230",
+        "codigo_erro": "E312",
+        "titulo": "Afastamento S-2230 rejeitado — vínculo empregatício não localizado no eSocial",
+        "descricao": "S-2230 (Afastamento Temporário) rejeitado com E312. O eSocial não localiza vínculo empregatício ativo para o CPF do trabalhador e o CNPJ do empregador informados no momento do envio do afastamento. Sem um S-2200 (Admissão) ativo e aceito, qualquer evento de afastamento temporário é bloqueado, pois o governo exige confirmação de que o trabalhador pertence ao quadro funcional ativo do empregador antes de registrar qualquer ausência.",
+        "causa_raiz": "O E312 no S-2230 ocorre por uma das seguintes razões: o S-2200 (Admissão) nunca foi transmitido ou ainda está pendente de processamento no momento do envio do S-2230; o S-2200 foi enviado com CPF diferente (erro de digitação) enquanto o S-2230 usa o CPF correto, causando inconsistência de chave; o vínculo foi encerrado via S-2299 (Desligamento) antes da transmissão do S-2230, ou seja, o afastamento está sendo enviado após término do contrato; o S-2200 foi excluído indevidamente via S-3000 sem que o sistema de integração tivesse ciência; ou o S-2230 foi enviado antes do aceite do S-2200 em situações de transmissão simultânea sem controle de dependência. Este erro é distinto do E350 (data anterior à admissão) e do E351 (período sobreposto), pois o E312 indica ausência total do vínculo, não inconsistência de datas.",
+        "passos_resolucao": [
+            "Consultar o CPF do trabalhador na plataforma eSocial e verificar se existe S-2200 com vínculo ativo para o CNPJ do empregador — acessar 'Trabalhadores' e localizar pelo CPF",
+            "Se o S-2200 não constar como aceito: verificar se foi transmitido e aguardar processamento, ou enviar o S-2200 com a data de admissão real do trabalhador antes de reenviar o S-2230",
+            "Confirmar que o campo cpfTrab no S-2230 é idêntico ao cpfTrab cadastrado no S-2200 aceito — qualquer divergência de dígito resulta em E312",
+            "Verificar se há S-2299 (Desligamento) aceito para o mesmo trabalhador com data anterior à data do afastamento — neste caso o vínculo já foi encerrado e o S-2230 não pode ser enviado",
+            "Se houver S-2299 indevido: enviar S-3000 para excluí-lo, aguardar processamento do cancelamento e então retransmitir o S-2230",
+            "Aguardar confirmação de aceite do S-2200 (cdResposta=201) antes de retransmitir o S-2230",
+            "Retransmitir o S-2230 somente após confirmação do vínculo ativo na plataforma eSocial"
+        ],
+        "validacao": "Confirmar S-2200 com vínculo ativo (cdResposta=201) na plataforma para o CPF e CNPJ em questão. Reenvio do S-2230 aceito com cdResposta=201 e afastamento registrado no histórico do trabalhador.",
+        "tempo_estimado": "2-4h",
+        "impacto": "alto",
+        "tags": ["S-2230", "E312", "afastamento", "vínculo", "S-2200", "admissão", "cpfTrab", "desligamento", "S-2299"]
+    },
+
+    # ──────────────────────────────────────────────────────
+    # ERROS DE PAGAMENTO DE RENDIMENTOS / NIS-PIS (KB071)
+    # ──────────────────────────────────────────────────────
+    {
+        "id": "KB071",
+        "evento": "S-1210",
+        "codigo_erro": "E301",
+        "titulo": "S-1210 rejeitado — NIS/PIS do trabalhador inválido ou divergente da base CNIS",
+        "descricao": "S-1210 (Pagamento de Rendimentos do Trabalho) rejeitado com E301. O número NIS/PIS (Número de Identificação Social / Programa de Integração Social) informado no campo nisTrabalh do S-1210 não passa na validação do dígito verificador ou diverge do NIS vinculado ao CPF do trabalhador na base do CNIS (Cadastro Nacional de Informações Sociais). O NIS é obrigatório no S-1210 para correto recolhimento do FGTS e cálculo do abono salarial, e qualquer inconsistência bloqueia o processamento do pagamento.",
+        "causa_raiz": "O NIS/PIS possui dígito verificador calculado pelo algoritmo de módulo 11 com pesos específicos. O E301 nesse contexto tem duas causas principais: (1) NIS inválido — o número informado não satisfaz o cálculo do dígito verificador, indicando erro de digitação ou número incorreto no cadastro do trabalhador no sistema de RH; (2) NIS divergente — o número é matematicamente válido mas não corresponde ao CPF do trabalhador na base do CNIS, situação que ocorre quando o trabalhador possui mais de um NIS/PIS (emitido em empresas ou bancos distintos ao longo da carreira) e o sistema de RH registrou um NIS diferente do que consta como principal no CNIS. Esta situação é distinta do KB008 (E301 por CPF divergente entre S-1200 e S-1210) pois aqui o problema está especificamente no campo nisTrabalh, não no CPF.",
+        "passos_resolucao": [
+            "Verificar o NIS/PIS do trabalhador no cartão do PIS/PASEP, na CTPS digital ou no aplicativo Carteira de Trabalho Digital do gov.br",
+            "Validar o dígito verificador do NIS informado usando calculadora de NIS/PIS — confirmar que o número de 11 dígitos é matematicamente válido pelo algoritmo de módulo 11",
+            "Consultar o NIS correto vinculado ao CPF do trabalhador no portal Meu INSS (https://meu.inss.gov.br) ou pelo CNIS via eSocial na opção de consulta de trabalhador",
+            "Se o trabalhador possuir múltiplos NIS/PIS: identificar o NIS principal cadastrado no CNIS e utilizar exclusivamente esse número no S-1210",
+            "Corrigir o campo nisTrabalh no cadastro do trabalhador no sistema de RH com o NIS validado pelo CNIS",
+            "Se necessário, atualizar o cadastro no eSocial via S-2206 (Alteração de Contrato de Trabalho) com o nisTrabalh correto antes do reenvio do S-1210",
+            "Retransmitir o S-1210 com o nisTrabalh corrigido e verificar aceite com cdResposta=201"
+        ],
+        "validacao": "S-1210 aceito com cdResposta=201. Confirmar que o nisTrabalh consta corretamente na plataforma eSocial e que o recolhimento do FGTS foi gerado para o período de apuração correspondente.",
+        "tempo_estimado": "1-2h",
+        "impacto": "médio",
+        "tags": ["S-1210", "E301", "NIS", "PIS", "nisTrabalh", "CNIS", "FGTS", "dígito verificador", "pagamento rendimentos"]
+    },
+
+    # ──────────────────────────────────────────────────────
+    # ERROS DE TABELA DE CARGOS (KB072)
+    # ──────────────────────────────────────────────────────
+    {
+        "id": "KB072",
+        "evento": "S-1030",
+        "codigo_erro": "E100",
+        "titulo": "Cargo já cadastrado — duplicata na tabela de cargos S-1030",
+        "descricao": "S-1030 (Tabela de Cargos/Empregos Públicos) rejeitado com E100. O código do cargo (codCargo) informado já existe na tabela de cargos do empregador na plataforma eSocial. O evento está sendo enviado como novo registro (indRetif=1) para um código que já foi previamente cadastrado, caracterizando duplicidade. O S-1030 é obrigatório para empregadores que utilizam o campo codCargo nos eventos de vínculo e remuneração, sendo a tabela de referência para todos os cargos e funções do quadro funcional.",
+        "causa_raiz": "O S-1030 mantém a tabela de cargos do empregador e é pré-requisito para eventos como S-2200, S-2206 e S-1200 quando referenciam codCargo. O E100 ocorre porque: o codCargo informado já foi cadastrado em S-1030 anterior aceito e o sistema de integração está tentando cadastrá-lo novamente como novo evento (indRetif=1); após timeout ou falha de comunicação, o sistema reenviou o S-1030 sem verificar se o aceite anterior foi processado; o operador criou novo cargo com código já existente sem consultar a tabela vigente; ou houve migração de sistema que duplicou registros de cargos. Para alterar a descrição, CBO, nível de remuneração ou qualquer campo de um cargo já cadastrado, deve-se usar indRetif=2 (retificação) com o nrRecEvt do S-1030 original aceito — nunca enviar novo S-1030 com o mesmo codCargo.",
+        "passos_resolucao": [
+            "Consultar a tabela de cargos cadastrados na plataforma eSocial para identificar o S-1030 existente com o mesmo codCargo",
+            "Copiar o nrRec do S-1030 já aceito com o codCargo em questão para uso como nrRecEvt na retificação",
+            "Se o objetivo for atualizar dados do cargo (descrição, CBO, vigência): alterar o S-1030 para indRetif=2 e preencher nrRecEvt com o nrRec do evento original",
+            "Se o objetivo for cadastrar um cargo distinto: utilizar um codCargo ainda não existente na tabela vigente do empregador",
+            "Retransmitir o S-1030 como retificação (indRetif=2) ou com novo codCargo conforme o caso identificado",
+            "Atualizar o sistema de integração com a lista atualizada de codCargo já cadastrados para evitar futuras duplicatas",
+            "Verificar se eventos de vínculo (S-2200, S-2206) que referenciam esse codCargo foram afetados e precisam ser retificados"
+        ],
+        "validacao": "S-1030 aceito com cdResposta=201. Confirmar na tabela de cargos da plataforma que o registro está atualizado. Verificar que eventos de vínculo que referenciam o codCargo são processados sem rejeição.",
+        "tempo_estimado": "1h",
+        "impacto": "baixo",
+        "tags": ["S-1030", "E100", "cargo", "codCargo", "duplicata", "tabela", "indRetif", "nrRecEvt", "CBO"]
+    },
+
+    # ──────────────────────────────────────────────────────
+    # ERROS DE CONDIÇÕES AMBIENTAIS / LTCAT-PPP (KB073)
+    # ──────────────────────────────────────────────────────
+    {
+        "id": "KB073",
+        "evento": "S-2240",
+        "codigo_erro": "E529",
+        "titulo": "S-2240 rejeitado — condições ambientais incompatíveis com código de exposição declarado (LTCAT/PPP)",
+        "descricao": "S-2240 (Condições Ambientais do Trabalho — Agentes Nocivos) rejeitado com E529. Existe incompatibilidade entre os dados do agente nocivo declarado no grupo de exposição (grpExp) e as informações do LTCAT (Laudo Técnico das Condições Ambientais do Trabalho) ou PPP (Perfil Profissiográfico Previdenciário) associados ao trabalhador. O eSocial valida que o código do agente nocivo (codAgNoc), o tipo de avaliação (tpAval) e a intensidade/concentração informados são consistentes com as tabelas normativas da NR-15 (Anexos I a XIII) e com a legislação previdenciária de aposentadoria especial.",
+        "causa_raiz": "O E529 ocorre quando há incompatibilidade entre os campos do S-2240 e as regras de negócio dos agentes nocivos definidos nas tabelas do eSocial. As causas mais comuns são: o codAgNoc pertence a categoria cujo tpAval exige avaliação quantitativa (tpAval=Q) mas foi declarado com tpAval=L (apenas laudo qualitativo), contrariando a NR-15 para aquele agente — por exemplo, ruído (codAgNoc 01.01.001) exige tpAval=Q com nível de pressão sonora medido; a intensidade ou concentração declarada está fora da faixa numérica aceita para o codAgNoc informado; o codAgNoc é incompatível com a função do trabalhador conforme as regras de vinculação do PPP; o período de vigência do S-2240 conflita com a data de emissão do LTCAT que fundamenta a exposição (dtIniCondicao anterior à emissão do laudo); ou o codAgNoc foi descontinuado ou revisado nas tabelas do eSocial e o sistema de integração ainda usa o código antigo.",
+        "passos_resolucao": [
+            "Identificar o codAgNoc rejeitado e consultar a Tabela 15 do eSocial (Agentes Nocivos) para verificar as exigências desse agente: tpAval obrigatório, unidade de medida válida e faixa de intensidade aceita",
+            "Verificar se o tpAval declarado é compatível com o codAgNoc: agentes da NR-15 Anexo I (ruído) e Anexo II (calor) exigem tpAval=Q com medição quantitativa — tpAval=L é inválido para esses agentes",
+            "Revisar os valores de intensidade/concentração informados no campo intConcentracao: confirmar que estão dentro da faixa válida para o codAgNoc e na unidade de medida correta (dB, °C, ppm, mg/m³) conforme a tabela",
+            "Validar que o LTCAT referenciado está vigente para o período de exposição: a data de emissão do LTCAT deve ser igual ou anterior ao dtIniCondicao declarado no S-2240",
+            "Verificar se o codAgNoc não foi revisionado nas atualizações das tabelas do eSocial — consultar o leiaute vigente e substituir por código atual se necessário",
+            "Corrigir os campos inconsistentes (tpAval, intConcentracao, unMed ou codAgNoc) conforme valores válidos identificados na Tabela 15 e no LTCAT/PPP atualizado com o engenheiro de segurança do trabalho",
+            "Retransmitir o S-2240 corrigido e confirmar que o histórico de exposição do trabalhador está correto na plataforma para fins de aposentadoria especial"
+        ],
+        "validacao": "S-2240 aceito com cdResposta=201. Confirmar na plataforma eSocial que o agente nocivo consta registrado com período de exposição correto no histórico do trabalhador. Verificar que o PPP gerado automaticamente reflete os dados de exposição declarados.",
+        "tempo_estimado": "2-4h (pode exigir revisão do LTCAT com engenheiro de segurança do trabalho)",
+        "impacto": "alto",
+        "tags": ["S-2240", "E529", "agente nocivo", "LTCAT", "PPP", "codAgNoc", "tpAval", "NR-15", "aposentadoria especial", "condições ambientais"]
+    },
 ]

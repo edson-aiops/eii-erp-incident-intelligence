@@ -239,9 +239,16 @@ def grade(query: str, candidates: list) -> list:
 # Step 3 — Generate
 # ─────────────────────────────────────────────────────────────────────────────
 
+_MENTOR_INSTRUCTION = (
+    "Explique seu raciocínio passo a passo como se estivesse ensinando um analista júnior. "
+    "Não dê apenas a resposta."
+)
+
+
 def generate(parsed_xml, relevant: list, incident_id: str,
              corrective_hint: str = "",
-             reflection_memory: list = None) -> dict:
+             reflection_memory: list = None,
+             mentor_mode: bool = False) -> dict:
     # Build context from relevant KB docs
     if relevant:
         ctx = "\n\n".join([
@@ -319,7 +326,8 @@ Gere um diagnóstico técnico preciso em JSON. Responda APENAS com o JSON, sem t
   "alerta_hitl": "motivo específico pelo qual um analista deve revisar antes de executar"
 }}"""
 
-    raw = _groq([{"role": "user", "content": prompt}], max_tokens=1000)
+    system_prompt = _MENTOR_INSTRUCTION if mentor_mode else ""
+    raw = _groq([{"role": "user", "content": prompt}], system=system_prompt, max_tokens=1000)
 
     try:
         match = re.search(r"\{.*\}", raw, re.DOTALL)
@@ -574,7 +582,8 @@ def reflect(parsed_xml, diagnosis: dict, eval_result: dict) -> str:
 # Full CRAG pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str) -> dict:
+def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str,
+             mentor_mode: bool = False) -> dict:
     # Build search query from parsed data
     query_parts = [
         parsed_xml.tipo_evento,
@@ -601,6 +610,7 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str) -> dict:
             parsed_xml, relevant, incident_id,
             corrective_hint=corrective_hint,
             reflection_memory=reflection_memory,
+            mentor_mode=mentor_mode,
         )
         eval_result = evaluate_diagnosis(parsed_xml, diagnosis, relevant, iteration)
         eval_history.append(eval_result)

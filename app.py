@@ -131,7 +131,7 @@ def load_sample(sample_name: str):
     return SAMPLE_XMLS.get(sample_name, "")
 
 
-def analyze_xml(xml_input: str):
+def analyze_xml(xml_input: str, mentor_mode: bool = False):
     """Parse XML → CRAG → return diagnosis markdown + hidden state."""
     if not xml_input or not xml_input.strip():
         return (
@@ -157,7 +157,7 @@ def analyze_xml(xml_input: str):
             gr.update(interactive=False),
         )
 
-    diagnosis = run_crag(COLLECTION, parsed, inc_id)
+    diagnosis = run_crag(COLLECTION, parsed, inc_id, mentor_mode=mentor_mode)
 
     _db_save_pending(inc_id, diagnosis, datetime.now().isoformat())
 
@@ -169,7 +169,7 @@ def analyze_xml(xml_input: str):
         parse_md,
         inc_id,
         inc_id,
-        gr.update(interactive=True),
+        gr.update(interactive=False),   # approve_btn: only enabled by HITL checklist
         gr.update(interactive=True),
     )
 
@@ -449,6 +449,11 @@ def run_batch(xml_text, max_workers):
         f"\n✅ Lote concluído — {ok} OK · {err} ERROR · total {n} XMLs"
     )
     yield "\n".join(log_lines), rows
+
+
+def _update_approve_btn(chk1: bool, chk2: bool, chk3: bool):
+    """Enable approve button only when all 3 HITL checkboxes are checked."""
+    return gr.update(interactive=bool(chk1 and chk2 and chk3))
 
 
 def render_placeholder() -> str:
@@ -743,6 +748,12 @@ with gr.Blocks(
                         )
                         load_btn = gr.Button("📂 Carregar", size="sm")
 
+                    mentor_mode_cb = gr.Checkbox(
+                        label="Modo Aprendiz",
+                        value=False,
+                        info="Entenda o porquê antes de decidir",
+                    )
+
                     analyze_btn = gr.Button(
                         "🔍 Analisar XML",
                         variant="primary",
@@ -795,12 +806,29 @@ with gr.Blocks(
                             "- Quais ajustes foram necessários?\n"
                             "- Ações executadas ou motivo da rejeição..."
                         ),
-                        lines=7,
+                        lines=5,
+                    )
+                    chk_periodo = gr.Checkbox(
+                        label="☑ Verifiquei o período de apuração",
+                        value=False,
+                    )
+                    chk_vinculo = gr.Checkbox(
+                        label="☑ Confirmei o vínculo do trabalhador",
+                        value=False,
+                    )
+                    chk_legislacao = gr.Checkbox(
+                        label="☑ Validei conforme legislação vigente",
+                        value=False,
+                    )
+                    hitl_justificativa = gr.Textbox(
+                        label="Justificativa (opcional)",
+                        lines=2,
                     )
                     with gr.Row():
                         approve_btn = gr.Button(
                             "✅ Aprovar e Registrar",
                             variant="primary",
+                            interactive=False,
                             elem_classes=["btn-approve"],
                         )
                         reject_btn = gr.Button(
@@ -940,14 +968,21 @@ O HITL é uma decisão de design — não uma limitação técnica.
 
     analyze_btn.click(
         fn=analyze_xml,
-        inputs=[xml_box],
+        inputs=[xml_box, mentor_mode_cb],
         outputs=[diagnosis_md, parsed_md, inc_id_display, hitl_inc_id,
                  approve_btn, reject_btn],
     )
 
+    for _chk in (chk_periodo, chk_vinculo, chk_legislacao):
+        _chk.change(
+            fn=_update_approve_btn,
+            inputs=[chk_periodo, chk_vinculo, chk_legislacao],
+            outputs=[approve_btn],
+        )
+
     approve_btn.click(
         fn=approve_incident,
-        inputs=[hitl_inc_id, hitl_notes],
+        inputs=[hitl_inc_id, hitl_justificativa],
         outputs=[decision_md, audit_md],
     )
 

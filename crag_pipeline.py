@@ -13,6 +13,7 @@ import os
 import hashlib
 from knowledge_base import KB
 from xml_parser import scrub_pii
+from llm_resilient import ResilientLLM
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -104,6 +105,17 @@ def _groq(messages: list, system: str = "", max_tokens: int = 800,
         return f"❌ Groq {r.status_code}: {r.text[:300]}"
     except Exception as e:
         return f"❌ Conexão Groq: {e}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ResilientLLM — global instance
+# Groq is primary; _groq is injected so existing crag_pipeline.requests.post
+# mocks in the test suite remain effective without any test changes.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Lambda wrapper — looks up _groq dynamically in this module's globals so that
+# unittest.mock.patch("crag_pipeline._groq") takes effect inside ResilientLLM.
+_resilient_llm = ResilientLLM(groq_caller=lambda *a, **kw: _groq(*a, **kw))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -241,7 +253,7 @@ def grade(query: str, candidates: list) -> list:
             "O documento é relevante para diagnosticar este incidente? "
             "Responda APENAS: RELEVANTE ou IRRELEVANTE"
         )
-        verdict = _groq(
+        verdict = _resilient_llm.call(
             [{"role": "user", "content": prompt}],
             max_tokens=5,
             model=MODEL_ROUTER,
@@ -343,7 +355,7 @@ Gere um diagnóstico técnico preciso em JSON. Responda APENAS com o JSON, sem t
 }}"""
 
     system_prompt = _MENTOR_INSTRUCTION if mentor_mode else ""
-    raw = _groq([{"role": "user", "content": prompt}], system=system_prompt, max_tokens=1000)
+    raw = _resilient_llm.call([{"role": "user", "content": prompt}], system=system_prompt, max_tokens=1000)
 
     try:
         match = re.search(r"\{.*\}", raw, re.DOTALL)
@@ -480,7 +492,7 @@ Responda APENAS com JSON, sem texto adicional:
   "regeneration_hint": "instrução imperativa e específica para corrigir o próximo diagnóstico (vazio se aprovado)"
 }}"""
 
-    raw = _groq(
+    raw = _resilient_llm.call(
         [{"role": "user", "content": prompt}],
         max_tokens=500,
         model=MODEL_ROUTER,
@@ -587,7 +599,7 @@ def reflect(parsed_xml, diagnosis: dict, eval_result: dict) -> str:
         "Seja técnico e específico sobre eSocial/RFB. Máximo 250 palavras."
     )
 
-    return _groq(
+    return _resilient_llm.call(
         [{"role": "user", "content": prompt}],
         max_tokens=400,
         model=MODEL_GENERATOR,

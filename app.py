@@ -174,15 +174,15 @@ def analyze_xml(xml_input: str, mentor_mode: bool = False):
     )
 
 
-def approve_incident(inc_id: str, notes: str):
-    return _decide(inc_id, notes, "APROVADO")
+def approve_incident(inc_id: str, notes: str, analista_id: str = ""):
+    return _decide(inc_id, notes, "APROVADO", analista_id)
 
 
-def reject_incident(inc_id: str, notes: str):
-    return _decide(inc_id, notes, "REJEITADO")
+def reject_incident(inc_id: str, notes: str, analista_id: str = ""):
+    return _decide(inc_id, notes, "REJEITADO", analista_id)
 
 
-def _decide(inc_id: str, notes: str, status: str):
+def _decide(inc_id: str, notes: str, status: str, analista_id: str = ""):
     dx = _db_fetch_pending(inc_id) if inc_id else None
     if dx is None:
         return (
@@ -190,7 +190,10 @@ def _decide(inc_id: str, notes: str, status: str):
             render_audit_log(),
         )
 
-    _db_decide(inc_id, status, notes or "—")
+    full_notes = (
+        f"[analista: {analista_id}] {notes or '—'}" if analista_id else (notes or "—")
+    )
+    _db_decide(inc_id, status, full_notes)
 
     icon     = "✅" if status == "APROVADO" else "❌"
     sev_icon = SEV.get(dx.get("severidade", "MÉDIO"), ("⚪", "#888"))[0]
@@ -204,10 +207,10 @@ def _decide(inc_id: str, notes: str, status: str):
 | **Evento** | {dx.get('evento', '—')} |
 | **Severidade** | {sev_icon} {dx.get('severidade', '—')} |
 | **Confiança IA** | {CONF.get(dx.get('confianca', 'BAIXA'), '—')} |
-| **Analista** | *(usuário atual)* |
+| **Analista** | {analista_id or '*(não informado)*'} |
 | **Registrado em** | {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} |
 
-**Notas do analista:** {notes or '—'}
+**Notas do analista:** {full_notes}
 
 ---
 *Resolução arquivada no log de auditoria.*
@@ -397,7 +400,7 @@ def render_diagnosis(dx: dict, parsed) -> str:
 **Acesse a aba ✋ Aprovação para registrar sua decisão antes de executar qualquer ação.**
 
 ---
-*EII CRAG Pipeline — {datetime.now().strftime('%d/%m/%Y %H:%M')} — eSocial KB v1.0*
+*EII CRAG Pipeline — {datetime.now().strftime('%d/%m/%Y %H:%M')} — eSocial KB v1.0 | KB hash: {dx.get('versao_kb', '')[:8] or '—'}*
 """
 
 
@@ -808,6 +811,11 @@ with gr.Blocks(
                         ),
                         lines=5,
                     )
+                    hitl_analista_id = gr.Textbox(
+                        label="Analista ID",
+                        placeholder="seu.nome@empresa.com",
+                        lines=1,
+                    )
                     chk_periodo = gr.Checkbox(
                         label="☑ Verifiquei o período de apuração",
                         value=False,
@@ -982,13 +990,13 @@ O HITL é uma decisão de design — não uma limitação técnica.
 
     approve_btn.click(
         fn=approve_incident,
-        inputs=[hitl_inc_id, hitl_justificativa],
+        inputs=[hitl_inc_id, hitl_justificativa, hitl_analista_id],
         outputs=[decision_md, audit_md],
     )
 
     reject_btn.click(
         fn=reject_incident,
-        inputs=[hitl_inc_id, hitl_notes],
+        inputs=[hitl_inc_id, hitl_notes, hitl_analista_id],
         outputs=[decision_md, audit_md],
     )
 

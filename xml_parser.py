@@ -11,19 +11,22 @@ from typing import Optional
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PII scrubbing — CPF, CNPJ, NIS/PIS
-# Order matters: CNPJ (14 digits) before CPF/NIS (11 digits)
+# PII scrubbing — CPF, CNPJ, NIS/PIS, nmTrab
+# Order matters: CNPJ (14 digits) before CPF/NIS (11 digits);
+#                XML-tag patterns before bare-digit patterns.
 # ─────────────────────────────────────────────────────────────────────────────
 
 _RE_CNPJ_FMT = re.compile(r'\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b')
 _RE_CNPJ_RAW = re.compile(r'\b\d{14}\b')
 _RE_NIS_FMT  = re.compile(r'\b\d{3}\.\d{5}\.\d{2}-\d{1}\b')
+_RE_NIS_XML  = re.compile(r'(<nisTrabalh>)(\d{11})(</nisTrabalh>)', re.IGNORECASE)
+_RE_NM_TRAB  = re.compile(r'(<nmTrab>)[^<]+(</nmTrab>)', re.IGNORECASE)
 _RE_CPF_FMT  = re.compile(r'\b\d{3}\.\d{3}\.\d{3}-\d{2}\b')
 _RE_CPF_RAW  = re.compile(r'\b\d{11}\b')
 
 
 def scrub_pii(text: str) -> str:
-    """Mask CPF, CNPJ and NIS/PIS before LLM prompts and persistence."""
+    """Mask CPF, CNPJ, NIS/PIS and worker name before LLM prompts and persistence."""
     if not text:
         return text
 
@@ -34,7 +37,14 @@ def scrub_pii(text: str) -> str:
     text = _RE_CNPJ_FMT.sub(lambda m: _mask(m, 'CNPJ', 2), text)
     text = _RE_CNPJ_RAW.sub(lambda m: _mask(m, 'CNPJ', 2), text)
     text = _RE_NIS_FMT.sub( lambda m: _mask(m, 'NIS',  1), text)
+    # NIS/PIS inside <nisTrabalh> XML tag (11 digits, no punctuation)
+    text = _RE_NIS_XML.sub(
+        lambda m: f"{m.group(1)}[NIS/****{m.group(2)[-1:]}]{m.group(3)}", text
+    )
+    # Worker name inside <nmTrab> XML tag
+    text = _RE_NM_TRAB.sub(lambda m: f"{m.group(1)}[NOME_SUPRIMIDO]{m.group(2)}", text)
     text = _RE_CPF_FMT.sub( lambda m: _mask(m, 'CPF',  2), text)
+    # CPF without formatting: \b\d{11}\b (also catches bare NIS not in XML tags)
     text = _RE_CPF_RAW.sub( lambda m: _mask(m, 'CPF',  2), text)
     return text
 

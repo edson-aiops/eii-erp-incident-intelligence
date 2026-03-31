@@ -10,8 +10,24 @@ import json
 import math
 import re
 import os
+import hashlib
 from knowledge_base import KB
 from xml_parser import scrub_pii
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# KB version hash — computed once at startup
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _compute_kb_hash() -> str:
+    try:
+        kb_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "knowledge_base.py")
+        with open(kb_path, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except Exception:
+        return ""
+
+_KB_HASH = _compute_kb_hash()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -681,4 +697,5 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str,
         "reflexion_iterations":     len(reflexion_history),
         "reflexion_history":        reflexion_history,
     }
+    diagnosis["versao_kb"] = _KB_HASH
     return diagnosis

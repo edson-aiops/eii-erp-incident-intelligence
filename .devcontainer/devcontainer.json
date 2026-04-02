@@ -15,7 +15,9 @@
     "QDRANT_API_KEY": "${localEnv:QDRANT_API_KEY}",
     "QDRANT_URL": "${localEnv:QDRANT_URL}",
     "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}",
-    "OPENAI_API_KEY": "${localEnv:OPENAI_API_KEY}"
+    "OPENAI_API_KEY": "${localEnv:OPENAI_API_KEY}",
+    "LANGSMITH_API_KEY": "${localEnv:LANGSMITH_API_KEY}",
+    "LANGSMITH_PROJECT": "${localEnv:LANGSMITH_PROJECT}"
   },
 
   // Porta padrão do Gradio

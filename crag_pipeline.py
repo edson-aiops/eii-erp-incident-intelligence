@@ -14,6 +14,7 @@ import hashlib
 from knowledge_base import KB
 from xml_parser import scrub_pii
 from llm_resilient import ResilientLLM
+from observability import traceable
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -200,6 +201,8 @@ def confidence_score(parsed_xml, diagnosis: dict) -> tuple:
 # Step 1 — Retrieve
 # ─────────────────────────────────────────────────────────────────────────────
 
+@traceable(name="EII.retrieve", run_type="retriever",
+           metadata={"step": "retrieve", "pipeline": "CRAG"})
 def retrieve(col: chromadb.Collection, query: str, n: int = 5,
              backend: str = None) -> list:
     """
@@ -240,6 +243,8 @@ def retrieve(col: chromadb.Collection, query: str, n: int = 5,
 # Step 2 — Grade (CRAG corrective filter)
 # ─────────────────────────────────────────────────────────────────────────────
 
+@traceable(name="EII.grade", run_type="chain",
+           metadata={"step": "grade", "pipeline": "CRAG"})
 def grade(query: str, candidates: list) -> list:
     relevant = []
     for c in candidates:
@@ -273,6 +278,8 @@ _MENTOR_INSTRUCTION = (
 )
 
 
+@traceable(name="EII.generate", run_type="llm",
+           metadata={"step": "generate", "pipeline": "CRAG"})
 def generate(parsed_xml, relevant: list, incident_id: str,
              corrective_hint: str = "",
              reflection_memory: list = None,
@@ -435,6 +442,8 @@ def _eval_verdict(criteria_passed: list) -> str:
     return "APPROVED"
 
 
+@traceable(name="EII.evaluate_diagnosis", run_type="chain",
+           metadata={"step": "evaluate_diagnosis", "pipeline": "CRAG"})
 def evaluate_diagnosis(parsed_xml, diagnosis: dict, relevant: list,
                        iteration: int) -> dict:
     """
@@ -550,6 +559,8 @@ Responda APENAS com JSON, sem texto adicional:
 # than the structured corrective_hint alone.
 # ─────────────────────────────────────────────────────────────────────────────
 
+@traceable(name="EII.reflect", run_type="llm",
+           metadata={"step": "reflect", "pipeline": "CRAG", "adr": "ADR-002"})
 def reflect(parsed_xml, diagnosis: dict, eval_result: dict) -> str:
     """
     Reflexion step: MODEL_GENERATOR reflects on its own prior failed diagnosis.
@@ -610,6 +621,8 @@ def reflect(parsed_xml, diagnosis: dict, eval_result: dict) -> str:
 # Full CRAG pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 
+@traceable(name="EII.run_crag", run_type="chain",
+           metadata={"step": "run_crag", "pipeline": "CRAG", "obs": "OBS-001"})
 def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str,
              mentor_mode: bool = False) -> dict:
     # Build search query from parsed data

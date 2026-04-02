@@ -195,6 +195,16 @@ def _decide(inc_id: str, notes: str, status: str, analista_id: str = ""):
     )
     _db_decide(inc_id, status, full_notes)
 
+    # Confidence-tier tracking: reward KB items that generated approved diagnoses
+    if status == "APROVADO":
+        kb_id = dx.get("fonte_kb_id", "")
+        if kb_id:
+            try:
+                from qdrant_client import increment_validacao
+                increment_validacao(kb_id)
+            except Exception:
+                pass  # non-critical — Qdrant may be unavailable in dev
+
     icon     = "✅" if status == "APROVADO" else "❌"
     sev_icon = SEV.get(dx.get("severidade", "MÉDIO"), ("⚪", "#888"))[0]
 

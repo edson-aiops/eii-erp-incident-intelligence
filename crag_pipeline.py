@@ -361,14 +361,15 @@ Gere um diagnóstico técnico preciso em JSON. Responda APENAS com o JSON, sem t
   "alerta_hitl": "motivo específico pelo qual um analista deve revisar antes de executar"
 }}"""
 
-    system_prompt = _MENTOR_INSTRUCTION if mentor_mode else ""
-    raw = _resilient_llm.call([{"role": "user", "content": prompt}], system=system_prompt, max_tokens=1000)
+    system_prompt  = _MENTOR_INSTRUCTION if mentor_mode else ""
+    raw            = _resilient_llm.call([{"role": "user", "content": prompt}], system=system_prompt, max_tokens=1000)
+    fonte_kb_id    = relevant[0]["id"] if relevant else ""
 
     try:
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        return json.loads(match.group() if match else raw)
+        match  = re.search(r"\{.*\}", raw, re.DOTALL)
+        result = json.loads(match.group() if match else raw)
     except Exception:
-        return {
+        result = {
             "incident_id": incident_id,
             "evento": parsed_xml.tipo_evento or "—",
             "codigo_erro": ", ".join(parsed_xml.error_codes) or parsed_xml.cd_resposta,
@@ -382,6 +383,9 @@ Gere um diagnóstico técnico preciso em JSON. Responda APENAS com o JSON, sem t
             "referencias_kb": [],
             "alerta_hitl": "Diagnóstico automático falhou — revisão humana obrigatória antes de qualquer ação."
         }
+
+    result["fonte_kb_id"] = fonte_kb_id
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────

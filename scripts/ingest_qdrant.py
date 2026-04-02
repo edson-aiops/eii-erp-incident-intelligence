@@ -271,7 +271,8 @@ def main() -> None:
             failed.append(doc_id)
             continue
 
-        # Payload armazena todos os 11 campos KB para reconstrução sem KB lookup
+        # Payload armazena todos os 11 campos KB para reconstrução sem KB lookup,
+        # mais contadores de confidence_tier para o sistema de gold-boost.
         payload = {
             "id":               item["id"],
             "evento":           item["evento"],
@@ -284,6 +285,8 @@ def main() -> None:
             "passos_resolucao": item.get("passos_resolucao", []),
             "validacao":        item.get("validacao", ""),
             "tempo_estimado":   item.get("tempo_estimado", ""),
+            "validacoes":       0,
+            "confidence_tier":  "standard",
         }
 
         batch.append({

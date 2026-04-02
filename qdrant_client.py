@@ -20,7 +20,10 @@ LLM_FALLBACK path — behaviour identical to having zero KB candidates.
 """
 
 import os
+import logging
 import requests
+
+_log = logging.getLogger(__name__)
 
 _DEFAULT_URL    = "https://7475580f-5477-4ecf-952a-151442465cad.us-east4-0.gcp.cloud.qdrant.io"
 _COLLECTION     = "eii_esocial"
@@ -94,6 +97,70 @@ def _kb_id_to_point_id(kb_id: str) -> int:
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
+def increment_validacao(kb_id: str) -> bool:
+    """
+    Increments the ``validacoes`` counter for a KB point in Qdrant and updates
+    its ``confidence_tier`` (standard → gold at 3 approvals).
+
+    Steps:
+      1. GET  /collections/eii_esocial/points/{point_id}  — read current payload
+      2. Increment ``validacoes`` (default 0 if absent)
+      3. Compute ``confidence_tier``: "gold" if validacoes >= 3, else "standard"
+      4. POST /collections/eii_esocial/points/payload     — overwrite the two fields
+
+    Returns True on success, False on any error (fails silently via log).
+    """
+    api_key = os.environ.get("QDRANT_API_KEY", "")
+    if not api_key:
+        return False
+
+    url      = os.environ.get("QDRANT_URL", _DEFAULT_URL).rstrip("/")
+    point_id = _kb_id_to_point_id(kb_id)
+
+    try:
+        # ── 1. Read current payload ───────────────────────────────────────────
+        r = requests.get(
+            f"{url}/collections/{_COLLECTION}/points/{point_id}",
+            headers={"api-key": api_key, "Content-Type": "application/json"},
+            timeout=_REQUEST_TIMEOUT,
+        )
+        if r.status_code != 200:
+            _log.warning("increment_validacao: GET point %s → HTTP %s", point_id, r.status_code)
+            return False
+
+        current_payload = r.json().get("result", {}).get("payload", {})
+
+        # ── 2–3. Compute new values ───────────────────────────────────────────
+        validacoes      = current_payload.get("validacoes", 0) + 1
+        confidence_tier = "gold" if validacoes >= 3 else "standard"
+
+        # ── 4. Patch only the two counter fields ──────────────────────────────
+        patch = requests.post(
+            f"{url}/collections/{_COLLECTION}/points/payload",
+            headers={"api-key": api_key, "Content-Type": "application/json"},
+            json={
+                "payload": {
+                    "validacoes":      validacoes,
+                    "confidence_tier": confidence_tier,
+                },
+                "points": [point_id],
+            },
+            timeout=_REQUEST_TIMEOUT,
+        )
+        if patch.status_code != 200:
+            _log.warning("increment_validacao: PATCH %s → HTTP %s", point_id, patch.status_code)
+            return False
+
+        _log.info(
+            "increment_validacao: %s validacoes=%d tier=%s", kb_id, validacoes, confidence_tier
+        )
+        return True
+
+    except Exception as exc:
+        _log.warning("increment_validacao(%s) failed: %s", kb_id, exc)
+        return False
+
+
 def retrieve_qdrant(query: str, n: int = 5) -> list:
     """
     Retrieves the top-n closest points from eii_esocial for *query*.
@@ -149,15 +216,22 @@ def retrieve_qdrant(query: str, n: int = 5) -> list:
 
         results = []
         for hit in hits[:n]:
-            score        = float(hit.get("score", 0.0))
-            hit_payload  = hit.get("payload", {})
-            item         = _build_item_from_payload(hit_payload)
+            score           = float(hit.get("score", 0.0))
+            hit_payload     = hit.get("payload", {})
+            item            = _build_item_from_payload(hit_payload)
+            confidence_tier = hit_payload.get("confidence_tier", "standard")
             results.append({
-                "id":            item["id"],
-                "distance":      round(1.0 - score, 4),  # similarity → distance
-                "document_name": item["titulo"],
-                "item":          item,
+                "id":              item["id"],
+                "distance":        round(1.0 - score, 4),  # similarity → distance
+                "document_name":   item["titulo"],
+                "confidence_tier": confidence_tier,
+                "item":            item,
             })
+
+        # Gold-boost: stable sort keeps original score order; gold items float
+        # above standard items when distances are equal.
+        results.sort(key=lambda r: (r["distance"], 0 if r["confidence_tier"] == "gold" else 1))
+
         return results
 
     except Exception:

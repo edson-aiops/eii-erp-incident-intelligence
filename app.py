@@ -542,7 +542,9 @@ body, .gradio-container {
 
 /* Tabs */
 .tab-nav { background: #FFFFFF !important; border-bottom: 1px solid #E5E7EB !important; }
-.tab-nav button {
+.tab-nav button,
+button[role="tab"],
+[role="tablist"] button {
     font-family: 'IBM Plex Sans', sans-serif !important;
     font-size: 0.85rem !important;
     color: #6B7280 !important;
@@ -551,7 +553,9 @@ body, .gradio-container {
     padding: 10px 20px !important;
     font-weight: 400 !important;
 }
-.tab-nav button.selected {
+.tab-nav button.selected,
+button[role="tab"][aria-selected="true"],
+[role="tablist"] button[aria-selected="true"] {
     color: #1D9E75 !important;
     border-bottom: 2px solid #1D9E75 !important;
     font-weight: 600 !important;

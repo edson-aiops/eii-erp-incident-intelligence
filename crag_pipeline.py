@@ -11,10 +11,13 @@ import math
 import re
 import os
 import hashlib
+from dotenv import load_dotenv
 from knowledge_base import KB
 from xml_parser import scrub_pii
 from llm_resilient import ResilientLLM
 from observability import traceable
+
+load_dotenv()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -109,14 +112,63 @@ def _groq(messages: list, system: str = "", max_tokens: int = 800,
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ResilientLLM — global instance
-# Groq is primary; _groq is injected so existing crag_pipeline.requests.post
-# mocks in the test suite remain effective without any test changes.
+# LLM Bridge — SmartRouter (primary) | ResilientLLM (fallback)
+#
+# _SmartRouterBridge adapts SmartRouterLLM.invoke() to the same
+# .call(messages, system, max_tokens, model) interface used throughout the
+# CRAG pipeline so no agent logic needs to change.
+#
+# Routing:  model == MODEL_ROUTER  → _llms["evaluator"]  (Cerebras, fast)
+#           model == MODEL_GENERATOR or default → _llms["diagnostic"] (deep)
+#
+# Note: _groq() and _groq_logprobs() are kept as-is — logprobs is a
+# Groq-specific feature not yet supported by SmartRouter.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Lambda wrapper — looks up _groq dynamically in this module's globals so that
-# unittest.mock.patch("crag_pipeline._groq") takes effect inside ResilientLLM.
-_resilient_llm = ResilientLLM(groq_caller=lambda *a, **kw: _groq(*a, **kw))
+try:
+    from smartrouter.eii_integration import create_eii_llms
+    from langchain_core.messages import (
+        AIMessage as _AIMessage,
+        HumanMessage as _HumanMessage,
+        SystemMessage as _LCSystemMessage,
+    )
+
+    _llms = create_eii_llms()
+
+    class _SmartRouterBridge:
+        """Wraps SmartRouterLLM with the ResilientLLM.call() interface.
+
+        Converts OpenAI-format message dicts → LangChain messages and routes
+        to the appropriate SmartRouterLLM based on the ``model`` hint:
+        - MODEL_ROUTER    → _llms["evaluator"]  (validation task — Cerebras)
+        - MODEL_GENERATOR → _llms["diagnostic"] (deep_reasoning — DeepSeek/Kimi)
+        """
+
+        def call(self, messages: list, system: str = "", max_tokens: int = 1000,
+                 model: str = None) -> str:
+            llm = _llms["evaluator"] if model == MODEL_ROUTER else _llms["diagnostic"]
+
+            lc_messages = []
+            if system:
+                lc_messages.append(_LCSystemMessage(content=system))
+            for msg in messages:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if role == "system":
+                    lc_messages.append(_LCSystemMessage(content=content))
+                elif role == "assistant":
+                    lc_messages.append(_AIMessage(content=content))
+                else:
+                    lc_messages.append(_HumanMessage(content=content))
+
+            return llm.invoke(lc_messages).content
+
+    _resilient_llm = _SmartRouterBridge()
+
+except ImportError:
+    # Fallback: SmartRouter not installed — delegate to ResilientLLM + Groq
+    # Lambda wrapper keeps unittest.mock.patch("crag_pipeline._groq") effective.
+    _resilient_llm = ResilientLLM(groq_caller=lambda *a, **kw: _groq(*a, **kw))
 
 
 # ─────────────────────────────────────────────────────────────────────────────

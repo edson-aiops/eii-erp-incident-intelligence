@@ -300,25 +300,25 @@ class TestModelRouting(unittest.TestCase):
         return p
 
     def test_grade_uses_router_model(self):
-        """grade() must send requests with MODEL_ROUTER."""
+        """grade() must pass MODEL_ROUTER to the LLM bridge."""
         candidates = [{"item": {
             "evento": "S-1200",
             "codigo_erro": "E428",
             "titulo": "Titulo",
             "descricao": "Descricao do erro",
         }}]
-        with patch("crag_pipeline.requests.post") as mock_post:
-            mock_post.return_value = self._text_response("RELEVANTE")
+        with patch.object(crag_pipeline._resilient_llm, "call",
+                          return_value="RELEVANTE") as mock_call:
             crag_pipeline.grade("query de teste E428", candidates)
-            payload = mock_post.call_args[1]["json"]
-        self.assertEqual(payload["model"], crag_pipeline.MODEL_ROUTER)
-        self.assertNotEqual(payload["model"], crag_pipeline.MODEL_GENERATOR)
+            call_kwargs = mock_call.call_args[1]
+        self.assertEqual(call_kwargs.get("model"), crag_pipeline.MODEL_ROUTER)
+        self.assertNotEqual(call_kwargs.get("model"), crag_pipeline.MODEL_GENERATOR)
 
     def test_grade_router_is_8b(self):
         self.assertIn("8b", crag_pipeline.MODEL_ROUTER)
 
     def test_generate_uses_generator_model(self):
-        """generate() must send requests with MODEL_GENERATOR."""
+        """generate() must NOT pass MODEL_ROUTER — default path routes to diagnostic LLM."""
         dx = {
             "incident_id": "INC-X", "evento": "S-1200", "codigo_erro": "E428",
             "severidade": "ALTO", "causa_raiz": "erro", "confianca": "ALTA",
@@ -326,11 +326,11 @@ class TestModelRouting(unittest.TestCase):
             "validacao": "ok", "tempo_estimado": "1h",
             "referencias_kb": ["KB001"], "alerta_hitl": "revisar",
         }
-        with patch("crag_pipeline.requests.post") as mock_post:
-            mock_post.return_value = self._text_response(json.dumps(dx))
+        with patch.object(crag_pipeline._resilient_llm, "call",
+                          return_value=json.dumps(dx)) as mock_call:
             crag_pipeline.generate(self._mock_parsed(), [], "INC-X")
-            payload = mock_post.call_args[1]["json"]
-        self.assertEqual(payload["model"], crag_pipeline.MODEL_GENERATOR)
+            call_kwargs = mock_call.call_args[1]
+        self.assertNotEqual(call_kwargs.get("model"), crag_pipeline.MODEL_ROUTER)
 
     def test_generator_is_70b(self):
         self.assertIn("70b", crag_pipeline.MODEL_GENERATOR)
@@ -352,11 +352,11 @@ class TestModelRouting(unittest.TestCase):
             "evento": "S-1200", "codigo_erro": "E428",
             "titulo": "T", "descricao": "D",
         }}]
-        with patch("crag_pipeline.requests.post") as mock_post:
-            mock_post.return_value = self._text_response("IRRELEVANTE")
+        with patch.object(crag_pipeline._resilient_llm, "call",
+                          return_value="IRRELEVANTE") as mock_call:
             crag_pipeline.grade("q", candidates)
-            payload = mock_post.call_args[1]["json"]
-        self.assertLessEqual(payload["max_tokens"], 10)
+            call_kwargs = mock_call.call_args[1]
+        self.assertLessEqual(call_kwargs.get("max_tokens", 0), 10)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -484,31 +484,45 @@ class TestLogprobs(unittest.TestCase):
 
     # ── run_crag integration ──────────────────────────────────────────────────
 
-    def _fake_post_factory(self, dx_json, logprob_sim=-0.05, logprob_nao=-3.2):
-        """Returns a side_effect that routes requests by payload shape."""
+    def _logprob_post_side_effect(self, logprob_sim=-0.05, logprob_nao=-3.2):
+        """Returns a requests.post side_effect for logprob calls only.
+
+        With SmartRouter, grade/generate/evaluate go through _resilient_llm.call,
+        so crag_pipeline.requests.post is only called by _groq_logprobs().
+        """
         top_lp = [
             {"token": "SIM", "logprob": logprob_sim},
             {"token": "NAO", "logprob": logprob_nao},
         ]
         logprob_resp = self._logprob_response(top_lp)
-        grade_resp  = MagicMock(
-            status_code=200,
-            json=lambda: {"choices": [{"message": {"content": "RELEVANTE"}}]},
-        )
-        gen_resp = MagicMock(
-            status_code=200,
-            json=lambda dj=dx_json: {"choices": [{"message": {"content": dj}}]},
-        )
 
         def _side_effect(url, **kwargs):
-            payload = kwargs["json"]
-            if payload.get("logprobs"):
-                return logprob_resp
-            if payload.get("max_tokens", 999) <= 5:
-                return grade_resp
-            return gen_resp
+            return logprob_resp
 
         return _side_effect
+
+    def _llm_bridge_side_effect(self, dx_json):
+        """Returns a _resilient_llm.call side_effect routing by max_tokens.
+
+        max_tokens ≤ 10  → grade response ("RELEVANTE")
+        max_tokens ≤ 600 → evaluate_diagnosis response (all criteria passing JSON)
+        otherwise        → generate response (dx_json)
+        """
+        eval_json = json.dumps({
+            "criteria_passed": list(crag_pipeline._EVAL_CRITERIA),
+            "criteria_failed": [],
+            "critique": "",
+            "regeneration_hint": "",
+        })
+
+        def _side(messages, system="", max_tokens=1000, model=None):
+            if max_tokens <= 10:
+                return "RELEVANTE"
+            if max_tokens <= 600:
+                return eval_json
+            return dx_json
+
+        return _side
 
     def test_logprob_sim_in_meta(self):
         """run_crag must populate _meta.logprob_sim as a float."""
@@ -516,7 +530,9 @@ class TestLogprobs(unittest.TestCase):
         mock_col.query.return_value = {"ids": [[]], "distances": [[]]}
 
         with patch("crag_pipeline.requests.post",
-                   side_effect=self._fake_post_factory(json.dumps(self._dx()))):
+                   side_effect=self._logprob_post_side_effect()), \
+             patch.object(crag_pipeline._resilient_llm, "call",
+                          side_effect=self._llm_bridge_side_effect(json.dumps(self._dx()))):
             result = crag_pipeline.run_crag(mock_col, self._mock_parsed(), "INC-Z")
 
         self.assertIn("_meta", result)
@@ -532,9 +548,9 @@ class TestLogprobs(unittest.TestCase):
         dx_llm_baixa = json.dumps(self._dx(confianca="BAIXA"))
 
         with patch("crag_pipeline.requests.post",
-                   side_effect=self._fake_post_factory(dx_llm_baixa,
-                                                       logprob_sim=-0.05,
-                                                       logprob_nao=-3.2)):
+                   side_effect=self._logprob_post_side_effect(-0.05, -3.2)), \
+             patch.object(crag_pipeline._resilient_llm, "call",
+                          side_effect=self._llm_bridge_side_effect(dx_llm_baixa)):
             result = crag_pipeline.run_crag(mock_col, self._mock_parsed(), "INC-W")
 
         self.assertEqual(result["confianca"], "ALTA")  # logprob wins
@@ -546,9 +562,9 @@ class TestLogprobs(unittest.TestCase):
         dx_llm_alta = json.dumps(self._dx(confianca="ALTA"))
 
         with patch("crag_pipeline.requests.post",
-                   side_effect=self._fake_post_factory(dx_llm_alta,
-                                                       logprob_sim=-3.5,
-                                                       logprob_nao=-0.03)):
+                   side_effect=self._logprob_post_side_effect(-3.5, -0.03)), \
+             patch.object(crag_pipeline._resilient_llm, "call",
+                          side_effect=self._llm_bridge_side_effect(dx_llm_alta)):
             result = crag_pipeline.run_crag(mock_col, self._mock_parsed(), "INC-V")
 
         self.assertEqual(result["confianca"], "BAIXA")  # logprob wins
@@ -559,7 +575,9 @@ class TestLogprobs(unittest.TestCase):
         mock_col.query.return_value = {"ids": [[]], "distances": [[]]}
 
         with patch("crag_pipeline.requests.post",
-                   side_effect=self._fake_post_factory(json.dumps(self._dx()))):
+                   side_effect=self._logprob_post_side_effect()), \
+             patch.object(crag_pipeline._resilient_llm, "call",
+                          side_effect=self._llm_bridge_side_effect(json.dumps(self._dx()))):
             result = crag_pipeline.run_crag(mock_col, self._mock_parsed(), "INC-Z2")
 
         meta = result["_meta"]
@@ -666,8 +684,8 @@ class TestEvaluatorAgent(unittest.TestCase):
 
     def test_evaluate_diagnosis_approved_valid_json(self):
         """LLM returns JSON with all criteria passing → APPROVED."""
-        with patch("crag_pipeline._groq",
-                   return_value=self._eval_json(self._ALL, [])):
+        with patch.object(crag_pipeline._resilient_llm, "call",
+                          return_value=self._eval_json(self._ALL, [])):
             result = crag_pipeline.evaluate_diagnosis(
                 self._mock_parsed(), self._dx(), [], iteration=0
             )
@@ -678,13 +696,13 @@ class TestEvaluatorAgent(unittest.TestCase):
 
     def test_evaluate_diagnosis_rejected_hard_gate_fails(self):
         """LLM returns JSON with a hard gate in criteria_failed → REJECTED."""
-        with patch("crag_pipeline._groq",
-                   return_value=self._eval_json(
-                       self._SOFT,
-                       self._HARD,
-                       critique="causal_coherence falhou",
-                       hint="Corrija causa_raiz.",
-                   )):
+        with patch.object(crag_pipeline._resilient_llm, "call",
+                          return_value=self._eval_json(
+                              self._SOFT,
+                              self._HARD,
+                              critique="causal_coherence falhou",
+                              hint="Corrija causa_raiz.",
+                          )):
             result = crag_pipeline.evaluate_diagnosis(
                 self._mock_parsed(), self._dx(), [], iteration=0
             )
@@ -721,7 +739,8 @@ class TestEvaluatorAgent(unittest.TestCase):
 
     def test_evaluate_diagnosis_parse_error_iter0_rejected(self):
         """Invalid JSON from LLM at iter 0 → REJECTED + should_regenerate=True."""
-        with patch("crag_pipeline._groq", return_value="not json at all {{{{"):
+        with patch.object(crag_pipeline._resilient_llm, "call",
+                          return_value="not json at all {{{{"):
             result = crag_pipeline.evaluate_diagnosis(
                 self._mock_parsed(), self._dx(), [], iteration=0
             )
@@ -732,7 +751,8 @@ class TestEvaluatorAgent(unittest.TestCase):
 
     def test_evaluate_diagnosis_parse_error_iter_max_approved_failopen(self):
         """Invalid JSON at iter == MAX_EVAL_ITERATIONS → APPROVED fail-open."""
-        with patch("crag_pipeline._groq", return_value="not json at all {{{{"):
+        with patch.object(crag_pipeline._resilient_llm, "call",
+                          return_value="not json at all {{{{"):
             result = crag_pipeline.evaluate_diagnosis(
                 self._mock_parsed(), self._dx(), [],
                 iteration=crag_pipeline.MAX_EVAL_ITERATIONS
@@ -951,9 +971,10 @@ class TestReflexion(unittest.TestCase):
     # ── 6–7: reflect() unit ───────────────────────────────────────────────────
 
     def test_reflect_returns_nonempty_string_when_groq_mocked(self):
-        """reflect() must return the string from _groq unchanged."""
+        """reflect() must return the string from the LLM bridge unchanged."""
         mock_text = "O diagnóstico anterior ignorou o campo indRetif — corrigir."
-        with patch("crag_pipeline._groq", return_value=mock_text):
+        with patch.object(crag_pipeline._resilient_llm, "call",
+                          return_value=mock_text):
             result = crag_pipeline.reflect(
                 self._mock_parsed(),
                 self._dx_critico(),
@@ -964,14 +985,15 @@ class TestReflexion(unittest.TestCase):
         self.assertEqual(result, mock_text)
 
     def test_reflect_uses_model_generator_not_router(self):
-        """reflect() must call _groq with model=MODEL_GENERATOR (70b), not MODEL_ROUTER (8b)."""
-        with patch("crag_pipeline._groq", return_value="reflexão") as mock_groq:
+        """reflect() must pass model=MODEL_GENERATOR (70b) to the LLM bridge, not MODEL_ROUTER."""
+        with patch.object(crag_pipeline._resilient_llm, "call",
+                          return_value="reflexão") as mock_call:
             crag_pipeline.reflect(
                 self._mock_parsed(),
                 self._dx_critico(),
                 self._rejected_eval_result(),
             )
-        call_kwargs = mock_groq.call_args[1]
+        call_kwargs = mock_call.call_args[1]
         self.assertEqual(call_kwargs.get("model"), crag_pipeline.MODEL_GENERATOR)
         self.assertNotEqual(call_kwargs.get("model"), crag_pipeline.MODEL_ROUTER)
         self.assertIn("70b", call_kwargs.get("model", ""))

@@ -24,10 +24,17 @@ from .schemas import (
     RoutingRule,
     RoutingResult,
 )
+from .adapter import SmartRouterLLM
+from .eii_integration import create_eii_llms, EII_AGENT_TASK_TYPES
 
 __all__ = [
     # Main API
     "SmartRouter",
+    # LangChain adapter
+    "SmartRouterLLM",
+    # EII integration helpers
+    "create_eii_llms",
+    "EII_AGENT_TASK_TYPES",
     # Components
     "TaskClassifier",
     "CircuitBreaker",

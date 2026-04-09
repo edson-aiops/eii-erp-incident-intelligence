@@ -3,3 +3,6 @@ chromadb>=0.6
 sentence-transformers==3.1.1
 requests==2.32.3
 langsmith>=0.1.0
+openai>=1.0.0
+tenacity>=8.2.0
+pydantic>=2.0.0

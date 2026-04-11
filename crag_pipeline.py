@@ -16,6 +16,9 @@ from knowledge_base import KB
 from xml_parser import scrub_pii
 from llm_resilient import ResilientLLM
 from observability import traceable
+from smartrouter.smart_router import SmartRouter
+
+smart_router = SmartRouter(lgpd_mode=True)
 
 load_dotenv()
 
@@ -780,3 +783,110 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str,
     }
     diagnosis["versao_kb"] = _KB_HASH
     return diagnosis
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 🚀 Wrapper Público: diagnosticar_incidente
+# Interface simplificada para uso externo com SmartRouter LGPD
+# ─────────────────────────────────────────────────────────────────────────────
+
+def diagnosticar_incidente(
+    xml_content: str,
+    incident_id: str,
+    error_code: str = None,
+    mentor_mode: bool = False,
+    force_cloud: bool = False,
+    force_local: bool = False
+) -> dict:
+    """
+    Diagnostica incidente eSocial com roteamento inteligente LGPD.
+    
+    Args:
+        xml_content: Conteúdo XML do evento eSocial
+        incident_id: ID único do incidente (ex: "INC-2026-001")
+        error_code: Código de erro adicional (opcional)
+        mentor_mode: Se True, inclui explicações didáticas no diagnóstico
+        force_cloud: Força uso da cloud (ignora detecção PII)
+        force_local: Força uso local Ollama (ignora detecção PII)
+    
+    Returns:
+        dict com diagnóstico estruturado + metadata de roteamento
+    """
+    from xml_parser import parse_xml  # Import local para evitar circular
+    
+    # 1. Parse do XML (com scrub_pii automático)
+    try:
+        parsed = parse_xml(xml_content)
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Falha ao parsear XML: {e}",
+            "incident_id": incident_id
+        }
+    
+    # 2. Preparar contexto para o SmartRouter
+    context = {
+        "xml_snippet": xml_content[:500],  # Trecho para detecção PII
+        "evento_tipo": parsed.tipo_evento,
+        "cd_resposta": parsed.cd_resposta,
+        "error_codes": parsed.error_codes,
+        "employee_data": {  # Dados que podem conter PII
+            "nr_inscricao": parsed.nr_inscricao,
+            "ocorrencias": [
+                {"codigo": o.codigo, "descricao": o.descricao}
+                for o in parsed.ocorrencias[:3]
+            ]
+        }
+    }
+    
+    # 3. Se houver error_code explícito, adiciona ao prompt
+    prompt_suffix = f" [Erro adicional: {error_code}]" if error_code else ""
+    
+    # 4. Chama o pipeline CRAG com SmartRouter
+    # O smart_router já está inicializado no topo do módulo
+    try:
+        result = run_crag(
+            col=build_vector_store(),  # Ou use um singleton se preferir
+            parsed_xml=parsed,
+            incident_id=incident_id,
+            mentor_mode=mentor_mode
+        )
+        
+        # 5. Adiciona metadata de roteamento LGPD ao resultado
+        result["_routing"] = {
+            "lgpd_mode": True,
+            "pii_detected": any([
+                parsed.nr_inscricao and len(parsed.nr_inscricao) >= 8,  # CNPJ/CPF
+                any(o.codigo in ["428", "429", "503"] for o in parsed.ocorrencias)  # Erros com PII
+            ]),
+            "force_cloud": force_cloud,
+            "force_local": force_local
+        }
+        
+        result["success"] = True
+        return result
+        
+    except Exception as e:
+        # Fallback: tenta chamada direta ao SmartRouter se CRAG falhar
+        try:
+            fallback = smart_router.call(
+                prompt=f"Diagnóstico emergencial para erro {error_code or parsed.cd_resposta}{prompt_suffix}",
+                context=context,
+                priority="cost",
+                force_cloud=force_cloud,
+                force_local=force_local
+            )
+            return {
+                "success": fallback.get("success", False),
+                "incident_id": incident_id,
+                "diagnosis": fallback.get("result", {}),
+                "route_used": fallback.get("_meta", {}).get("route"),
+                "error": fallback.get("error"),
+                "_routing": {"fallback": True}
+            }
+        except Exception as e2:
+            return {
+                "success": False,
+                "error": f"CRAG falhou: {e} | Fallback falhou: {e2}",
+                "incident_id": incident_id
+            }

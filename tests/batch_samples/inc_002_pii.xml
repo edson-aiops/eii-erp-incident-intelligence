@@ -1,0 +1,6 @@
+﻿<evtAdmissao xmlns="http://www.esocial.gov.br/schema/evt/evtAdmissao/v_S_01_02_00">
+  <ideEvento><tpAmb>1</tpAmb></ideEvento>
+  <ideEmpregador><nrInsc>12345678000190</nrInsc></ideEmpregador>
+  <trabalhador><cpf>123.456.789-00</cpf><nis>98765432101</nis></trabalhador>
+  <infoRegimeTrab><infoCeletista><dtAdm>2024-01-15</dtAdm></infoCeletista></infoRegimeTrab>
+</evtAdmissao>

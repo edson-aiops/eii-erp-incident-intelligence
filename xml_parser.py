@@ -434,3 +434,10 @@ SAMPLE_XMLS = {
   </retornoEnvioLoteEventos>
 </eSocial>""",
 }
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Compatibilidade: alias para código legado que usa 'parse_xml'
+# ─────────────────────────────────────────────────────────────────────────────
+parse_xml = parse_esocial_xml

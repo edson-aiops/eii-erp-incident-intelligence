@@ -13,13 +13,15 @@ import os
 import hashlib
 from dotenv import load_dotenv
 from knowledge_base import KB
-from xml_parser import scrub_pii
+from xml_parser import scrub_pii, parse_esocial_xml
 from llm_resilient import ResilientLLM
-from observability import traceable
 from smartrouter.smart_router import SmartRouter
+from langsmith import traceable
 
+# Inicializar SmartRouter com LGPD
 smart_router = SmartRouter(lgpd_mode=True)
 
+# Carregar variáveis de ambiente
 load_dotenv()
 
 
@@ -86,14 +88,14 @@ MODEL_GENERATOR = os.environ.get("EII_MODEL_GENERATOR", "llama-3.3-70b-versatile
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LLM — Groq
+# LLM — Groq (fallback direto)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _groq(messages: list, system: str = "", max_tokens: int = 800,
           model: str = MODEL_GENERATOR) -> str:
     api_key = os.environ.get("GROQ_API_KEY", "")
     if not api_key:
-        return "❌ GROQ_API_KEY não configurada. Adicione nas Secrets do HuggingFace Space."
+        return "❌ GROQ_API_KEY não configurada."
 
     payload = {
         "model": model,
@@ -116,16 +118,6 @@ def _groq(messages: list, system: str = "", max_tokens: int = 800,
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LLM Bridge — SmartRouter (primary) | ResilientLLM (fallback)
-#
-# _SmartRouterBridge adapts SmartRouterLLM.invoke() to the same
-# .call(messages, system, max_tokens, model) interface used throughout the
-# CRAG pipeline so no agent logic needs to change.
-#
-# Routing:  model == MODEL_ROUTER  → _llms["evaluator"]  (Cerebras, fast)
-#           model == MODEL_GENERATOR or default → _llms["diagnostic"] (deep)
-#
-# Note: _groq() and _groq_logprobs() are kept as-is — logprobs is a
-# Groq-specific feature not yet supported by SmartRouter.
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
@@ -139,13 +131,7 @@ try:
     _llms = create_eii_llms()
 
     class _SmartRouterBridge:
-        """Wraps SmartRouterLLM with the ResilientLLM.call() interface.
-
-        Converts OpenAI-format message dicts → LangChain messages and routes
-        to the appropriate SmartRouterLLM based on the ``model`` hint:
-        - MODEL_ROUTER    → _llms["evaluator"]  (validation task — Cerebras)
-        - MODEL_GENERATOR → _llms["diagnostic"] (deep_reasoning — DeepSeek/Kimi)
-        """
+        """Wraps SmartRouterLLM with the ResilientLLM.call() interface."""
 
         def call(self, messages: list, system: str = "", max_tokens: int = 1000,
                  model: str = None) -> str:
@@ -170,15 +156,11 @@ try:
 
 except ImportError:
     # Fallback: SmartRouter not installed — delegate to ResilientLLM + Groq
-    # Lambda wrapper keeps unittest.mock.patch("crag_pipeline._groq") effective.
     _resilient_llm = ResilientLLM(groq_caller=lambda *a, **kw: _groq(*a, **kw))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ADR-001 — Logprobs confidence gate
-# Calls Groq with logprobs=True, max_tokens=1.
-# Measures P(SIM) over top-5 candidate tokens to score diagnosis confidence.
-# Thresholds: ≥0.80 → ALTA | ≥0.55 → MÉDIA | <0.55 → BAIXA
 # ─────────────────────────────────────────────────────────────────────────────
 
 _AFFIRMATIVE = {"SIM", "S", "YES", "Y"}
@@ -228,11 +210,7 @@ def _groq_logprobs(messages: list) -> float:
 
 
 def confidence_score(parsed_xml, diagnosis: dict) -> tuple:
-    """
-    Binary confidence gate (ADR-001).
-    Asks MODEL_ROUTER to confirm the diagnosis; measures P(SIM) via logprobs.
-    Returns (label: str, prob_sim: float).
-    """
+    """Binary confidence gate (ADR-001)."""
     ocorrencias_txt = "; ".join([
         f"[{o.codigo}] {o.descricao[:80]}"
         for o in parsed_xml.ocorrencias[:3]
@@ -260,16 +238,7 @@ def confidence_score(parsed_xml, diagnosis: dict) -> tuple:
            metadata={"step": "retrieve", "pipeline": "CRAG"})
 def retrieve(col: chromadb.Collection, query: str, n: int = 5,
              backend: str = None) -> list:
-    """
-    Retrieve top-n candidates for *query*.
-
-    backend="ragflow"  → calls RAGFlow Cloud via ragflow_client.retrieve_ragflow()
-    backend="chromadb" → uses the in-memory ChromaDB collection (default)
-    backend=None       → reads EII_RETRIEVAL_BACKEND env var (default: "chromadb")
-
-    The col argument is required for backward compatibility but is ignored when
-    backend="ragflow".
-    """
+    """Retrieve top-n candidates for *query*."""
     effective_backend = backend or os.environ.get("EII_RETRIEVAL_BACKEND", "chromadb")
 
     if effective_backend == "ragflow":
@@ -445,33 +414,13 @@ Gere um diagnóstico técnico preciso em JSON. Responda APENAS com o JSON, sem t
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 4 — EvaluatorAgent (Evaluator-Optimizer pattern)
-# Uses MODEL_ROUTER (8b) to score the diagnosis against 5 quality criteria.
-# Returns a structured EvalResult that drives the generate→evaluate loop.
-#
-# Criteria (hard gates: 1,2,4 — soft: 3,5):
-#   1. causal_coherence        — causa_raiz explains the actual error codes
-#   2. resolution_actionability — passos_resolucao are specific and actionable
-#   3. kb_grounding            — diagnosis is consistent with retrieved KB docs
-#   4. schema_completeness     — all required fields present and non-empty
-#   5. severity_calibration    — severidade is proportional to the error
 # ─────────────────────────────────────────────────────────────────────────────
 
-MAX_EVAL_ITERATIONS      = 2   # up to 3 total generate calls (iter 0, 1, 2)
-MAX_REFLECTION_ITERATIONS = 1  # at most 1 reflect() call per run_crag
+MAX_EVAL_ITERATIONS      = 2
+MAX_REFLECTION_ITERATIONS = 1
 
 
 def _reflexion_should_trigger(diagnosis: dict) -> tuple:
-    """
-    Returns (triggered: bool, reason: str).
-
-    Conditions (OR logic — any one suffices):
-      - severidade == "CRÍTICO"  : high-stakes error, misdiagnosis has fiscal/legal impact
-      - confianca  == "BAIXA"    : LLM self-reported uncertainty (proxy for logprob_sim < 0.45
-                                   which is only available after the loop)
-      - fonte      == "LLM_FALLBACK" : no KB match — parametric knowledge path, higher hallucination risk
-
-    Reflexion is only ever invoked from run_crag() when iter 0 was REJECTED.
-    """
     if diagnosis.get("severidade") == "CRÍTICO":
         return True, "CRÍTICO"
     if diagnosis.get("confianca") == "BAIXA":
@@ -491,7 +440,6 @@ _EVAL_HARD_GATES = {"causal_coherence", "resolution_actionability", "schema_comp
 
 
 def _eval_verdict(criteria_passed: list) -> str:
-    """APPROVED iff all hard gates pass AND at least one soft criterion passes."""
     passed = set(criteria_passed)
     if not _EVAL_HARD_GATES.issubset(passed):
         return "REJECTED"
@@ -505,16 +453,6 @@ def _eval_verdict(criteria_passed: list) -> str:
            metadata={"step": "evaluate_diagnosis", "pipeline": "CRAG"})
 def evaluate_diagnosis(parsed_xml, diagnosis: dict, relevant: list,
                        iteration: int) -> dict:
-    """
-    Evaluates a generated diagnosis against 5 quality criteria.
-    Returns an EvalResult dict:
-      verdict            "APPROVED" | "REJECTED"
-      criteria_passed    list[str]
-      criteria_failed    list[str]
-      critique           str  (PT-BR; "" if APPROVED)
-      should_regenerate  bool
-      regeneration_hint  str  (imperative directive for next generate call)
-    """
     ocorrencias_txt = "; ".join(
         f"[{o.codigo}] {o.descricao[:80]}" for o in parsed_xml.ocorrencias[:3]
     ) or parsed_xml.cd_resposta
@@ -566,13 +504,11 @@ Responda APENAS com JSON, sem texto adicional:
         model=MODEL_ROUTER,
     )
 
-    # Parse evaluator response
     try:
         match = re.search(r"\{.*\}", raw, re.DOTALL)
         data = json.loads(match.group() if match else raw)
         criteria_passed = [c for c in data.get("criteria_passed", []) if c in _EVAL_CRITERIA]
         criteria_failed = [c for c in data.get("criteria_failed", []) if c in _EVAL_CRITERIA]
-        # Ensure every criterion is accounted for
         accounted = set(criteria_passed) | set(criteria_failed)
         for c in _EVAL_CRITERIA:
             if c not in accounted:
@@ -581,7 +517,6 @@ Responda APENAS com JSON, sem texto adicional:
         regeneration_hint = data.get("regeneration_hint", "")[:300]
         verdict = _eval_verdict(criteria_passed)
     except Exception:
-        # Fail-safe: iteration 0 → force retry; iteration ≥ MAX → fail-open
         if iteration < MAX_EVAL_ITERATIONS:
             criteria_passed = []
             criteria_failed = list(_EVAL_CRITERIA)
@@ -608,28 +543,12 @@ Responda APENAS com JSON, sem texto adicional:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 5 — Reflexion  (ADR-002)
-# Self-critique: MODEL_GENERATOR (70b) reflects on its own rejected diagnosis.
-# Only triggered for high-stakes cases (CRÍTICO | BAIXA_CONFIANCA | LLM_FALLBACK)
-# at iteration 0 REJECTED. Max 1 reflection per run_crag call.
-#
-# The free-text reflection is accumulated in reflection_memory and injected
-# into the next generate() prompt, giving the model richer episodic context
-# than the structured corrective_hint alone.
+# Step 5 — Reflexion (ADR-002)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @traceable(name="EII.reflect", run_type="llm",
            metadata={"step": "reflect", "pipeline": "CRAG", "adr": "ADR-002"})
 def reflect(parsed_xml, diagnosis: dict, eval_result: dict) -> str:
-    """
-    Reflexion step: MODEL_GENERATOR reflects on its own prior failed diagnosis.
-
-    Takes the rejected diagnosis and evaluator critique, produces a free-text
-    verbal self-critique that is stored as episodic memory and injected into
-    the next generate() call.
-
-    Returns the reflection string (~200–400 tokens).
-    """
     _LABELS = {
         "causal_coherence":         "Coerência causal",
         "resolution_actionability": "Acionabilidade dos passos",
@@ -684,7 +603,6 @@ def reflect(parsed_xml, diagnosis: dict, eval_result: dict) -> str:
            metadata={"step": "run_crag", "pipeline": "CRAG", "obs": "OBS-001"})
 def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str,
              mentor_mode: bool = False) -> dict:
-    # Build search query from parsed data
     query_parts = [
         parsed_xml.tipo_evento,
         parsed_xml.cd_resposta,
@@ -698,11 +616,10 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str,
     candidates = retrieve(col, query, backend=backend)
     relevant   = grade(query, candidates)
 
-    # ── Evaluator-Optimizer + Reflexion loop ─────────────────────────────────
     corrective_hint      = ""
     eval_history         = []
-    reflection_memory    = []          # accumulates reflect() outputs
-    reflexion_history    = []          # _meta audit trail
+    reflection_memory    = []
+    reflexion_history    = []
     reflexion_trigger_reason = ""
 
     for iteration in range(MAX_EVAL_ITERATIONS + 1):
@@ -720,9 +637,6 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str,
 
         corrective_hint = eval_result["regeneration_hint"]
 
-        # ── Reflexion gate ────────────────────────────────────────────────────
-        # Activates at iteration 0 REJECTED for high-stakes / low-confidence cases.
-        # MAX_REFLECTION_ITERATIONS=1 caps the reflect() call budget at one per run.
         if (
             iteration == 0
             and len(reflexion_history) < MAX_REFLECTION_ITERATIONS
@@ -741,7 +655,6 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str,
 
     final_eval = eval_history[-1]
 
-    # Safety coupling: REJECTED_MAX_ITER → force HITL escalation
     if final_eval["verdict"] != "APPROVED":
         diagnosis["alerta_hitl"] = (
             "⚠️ Avaliador automático não aprovou este diagnóstico após "
@@ -749,18 +662,15 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str,
             + (final_eval["critique"] or "")
         )[:500]
 
-    # ADR-001: override LLM-generated confianca with calibrated logprob score
     confianca, prob_sim = confidence_score(parsed_xml, diagnosis)
     diagnosis["confianca"] = confianca
 
     diagnosis["_meta"] = {
-        # existing fields
         "retrieval_backend":     backend,
         "candidates_retrieved":  len(candidates),
         "candidates_relevant":   len(relevant),
         "query_used":            query[:200],
         "logprob_sim":           round(prob_sim, 3),
-        # evaluator fields
         "eval_iterations":       len(eval_history),
         "eval_final_verdict":    final_eval["verdict"],
         "eval_criteria_passed":  final_eval["criteria_passed"],
@@ -775,7 +685,6 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str,
             }
             for i, e in enumerate(eval_history)
         ],
-        # reflexion fields (ADR-002)
         "reflexion_triggered":      len(reflexion_history) > 0,
         "reflexion_trigger_reason": reflexion_trigger_reason,
         "reflexion_iterations":     len(reflexion_history),
@@ -787,7 +696,6 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str,
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 🚀 Wrapper Público: diagnosticar_incidente
-# Interface simplificada para uso externo com SmartRouter LGPD
 # ─────────────────────────────────────────────────────────────────────────────
 
 def diagnosticar_incidente(
@@ -798,25 +706,11 @@ def diagnosticar_incidente(
     force_cloud: bool = False,
     force_local: bool = False
 ) -> dict:
-    """
-    Diagnostica incidente eSocial com roteamento inteligente LGPD.
+    """Diagnostica incidente eSocial com roteamento inteligente LGPD."""
     
-    Args:
-        xml_content: Conteúdo XML do evento eSocial
-        incident_id: ID único do incidente (ex: "INC-2026-001")
-        error_code: Código de erro adicional (opcional)
-        mentor_mode: Se True, inclui explicações didáticas no diagnóstico
-        force_cloud: Força uso da cloud (ignora detecção PII)
-        force_local: Força uso local Ollama (ignora detecção PII)
-    
-    Returns:
-        dict com diagnóstico estruturado + metadata de roteamento
-    """
-    from xml_parser import parse_xml  # Import local para evitar circular
-    
-    # 1. Parse do XML (com scrub_pii automático)
+    # 1. Parse do XML
     try:
-        parsed = parse_xml(xml_content)
+        parsed = parse_esocial_xml(xml_content)
     except Exception as e:
         return {
             "success": False,
@@ -824,13 +718,13 @@ def diagnosticar_incidente(
             "incident_id": incident_id
         }
     
-    # 2. Preparar contexto para o SmartRouter
+    # 2. Preparar contexto
     context = {
-        "xml_snippet": xml_content[:500],  # Trecho para detecção PII
+        "xml_snippet": xml_content[:500],
         "evento_tipo": parsed.tipo_evento,
         "cd_resposta": parsed.cd_resposta,
         "error_codes": parsed.error_codes,
-        "employee_data": {  # Dados que podem conter PII
+        "employee_data": {
             "nr_inscricao": parsed.nr_inscricao,
             "ocorrencias": [
                 {"codigo": o.codigo, "descricao": o.descricao}
@@ -839,25 +733,22 @@ def diagnosticar_incidente(
         }
     }
     
-    # 3. Se houver error_code explícito, adiciona ao prompt
     prompt_suffix = f" [Erro adicional: {error_code}]" if error_code else ""
     
-    # 4. Chama o pipeline CRAG com SmartRouter
-    # O smart_router já está inicializado no topo do módulo
+    # 3. Chamar pipeline CRAG
     try:
         result = run_crag(
-            col=build_vector_store(),  # Ou use um singleton se preferir
+            col=build_vector_store(),
             parsed_xml=parsed,
             incident_id=incident_id,
             mentor_mode=mentor_mode
         )
         
-        # 5. Adiciona metadata de roteamento LGPD ao resultado
         result["_routing"] = {
             "lgpd_mode": True,
             "pii_detected": any([
-                parsed.nr_inscricao and len(parsed.nr_inscricao) >= 8,  # CNPJ/CPF
-                any(o.codigo in ["428", "429", "503"] for o in parsed.ocorrencias)  # Erros com PII
+                parsed.nr_inscricao and len(parsed.nr_inscricao) >= 8,
+                any(o.codigo in ["428", "429", "503"] for o in parsed.ocorrencias)
             ]),
             "force_cloud": force_cloud,
             "force_local": force_local
@@ -867,7 +758,7 @@ def diagnosticar_incidente(
         return result
         
     except Exception as e:
-        # Fallback: tenta chamada direta ao SmartRouter se CRAG falhar
+        # Fallback para SmartRouter direto
         try:
             fallback = smart_router.call(
                 prompt=f"Diagnóstico emergencial para erro {error_code or parsed.cd_resposta}{prompt_suffix}",

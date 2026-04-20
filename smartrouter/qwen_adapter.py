@@ -7,6 +7,7 @@ import os
 import re
 from typing import Dict, Optional
 from openai import OpenAI
+from smartrouter.cache import get_cache, cached_task
 from tenacity import retry, stop_after_attempt, wait_exponential
 import logging
 
@@ -41,27 +42,25 @@ class QwenAdapter:
         )
     
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    @cached_task(max_size=500, ttl_seconds=1800)  # Cache: 500 items, 30 min TTL
     def supervise_task(
         self,
         task: str,
         context: Optional[Dict] = None,
         output_format: str = "json"
     ) -> Dict:
-        """Atua como supervisor: planeja, delega e valida tarefas"""
+        """Atua como supervisor: planeja, delega e valida tarefas (COM CACHE)"""
         
         system_prompt = self._build_supervisor_prompt(output_format)
         user_content = self._build_user_prompt(task, context)
         
-        # Chamada SEM response_format para evitar conflito na Groq
+        # Chamada SEM response_format para compatibilidade Groq
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
             ],
-            # REMOVIDO: response_format={"type": "json_object"}
-            # Motivo: Groq retorna InternalServerError com este parâmetro
             temperature=0.1,
             max_tokens=2000
         )
@@ -71,10 +70,16 @@ class QwenAdapter:
         
         # Tenta parsear JSON direto, se falhar extrai do texto
         try:
-            return json.loads(content)
+            result = json.loads(content)
         except json.JSONDecodeError:
             logger.warning("JSON parse falhou, extraindo do texto...")
-            return self._extract_json_from_text(content)
+            result = self._extract_json_from_text(content)
+        
+        # Adiciona metadata de cache
+        result["_meta"] = result.get("_meta", {})
+        result["_meta"]["cache_hit"] = False  # Só chega aqui se foi cache miss
+        
+        return result
     
     def _build_supervisor_prompt(self, output_format: str) -> str:
         return f"""

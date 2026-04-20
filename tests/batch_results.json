@@ -1,0 +1,258 @@
+{
+  "stats": {
+    "total": 6,
+    "successful": 2,
+    "failed": 1,
+    "success_rate_percent": 33.33,
+    "cloud_calls": 0,
+    "local_calls": 0,
+    "pii_detected": 2,
+    "cache_hits": 0,
+    "cache_hit_rate_percent": 0.0,
+    "avg_latency_ms": 9246.6,
+    "elapsed_seconds": 49.16,
+    "throughput_per_second": 0.12
+  },
+  "results": [
+    {
+      "incident_id": "TEST-PUB-001",
+      "success": true,
+      "diagnosis": {
+        "incident_id": "TEST-PUB-001",
+        "evento": "—",
+        "codigo_erro": "",
+        "severidade": "MÉDIO",
+        "causa_raiz": "❌ Todos os providers LLM falharam. Verifique as API keys (GROQ_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY) e a conectividade de rede.",
+        "confianca": "MÉDIA",
+        "fonte": "PARSE_ERROR",
+        "passos_resolucao": [
+          "Análise manual necessária — diagnóstico automático falhou."
+        ],
+        "validacao": "Verificar manualmente com especialista eSocial.",
+        "tempo_estimado": "Indefinido",
+        "referencias_kb": [],
+        "alerta_hitl": "Diagnóstico automático falhou — revisão humana obrigatória antes de qualquer ação.",
+        "fonte_kb_id": "",
+        "_meta": {
+          "retrieval_backend": "chromadb",
+          "candidates_retrieved": 5,
+          "candidates_relevant": 0,
+          "query_used": "",
+          "logprob_sim": 0.5,
+          "eval_iterations": 3,
+          "eval_final_verdict": "APPROVED",
+          "eval_criteria_passed": [
+            "causal_coherence",
+            "resolution_actionability",
+            "kb_grounding",
+            "schema_completeness",
+            "severity_calibration"
+          ],
+          "eval_criteria_failed": [],
+          "eval_critique_last": "Avaliador não pôde ser executado — diagnóstico aceito por exaustão de tentativas.",
+          "eval_score_history": [
+            {
+              "iteration": 0,
+              "verdict": "REJECTED",
+              "criteria_passed": [],
+              "criteria_failed": [
+                "causal_coherence",
+                "resolution_actionability",
+                "kb_grounding",
+                "schema_completeness",
+                "severity_calibration"
+              ]
+            },
+            {
+              "iteration": 1,
+              "verdict": "REJECTED",
+              "criteria_passed": [],
+              "criteria_failed": [
+                "causal_coherence",
+                "resolution_actionability",
+                "kb_grounding",
+                "schema_completeness",
+                "severity_calibration"
+              ]
+            },
+            {
+              "iteration": 2,
+              "verdict": "APPROVED",
+              "criteria_passed": [
+                "causal_coherence",
+                "resolution_actionability",
+                "kb_grounding",
+                "schema_completeness",
+                "severity_calibration"
+              ],
+              "criteria_failed": []
+            }
+          ],
+          "reflexion_triggered": true,
+          "reflexion_trigger_reason": "BAIXA_CONFIANCA",
+          "reflexion_iterations": 1,
+          "reflexion_history": [
+            {
+              "iteration": 0,
+              "reflection_text": "❌ Todos os providers LLM falharam. Verifique as API keys (GROQ_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY) e a conectividade de rede.",
+              "eval_verdict_before": "REJECTED",
+              "criteria_failed": [
+                "causal_coherence",
+                "resolution_actionability",
+                "kb_grounding",
+                "schema_completeness",
+                "severity_calibration"
+              ]
+            }
+          ]
+        },
+        "versao_kb": "59537bb138d54ca678fbde17889e24430d16123e2038cf09777f8ddf14301242",
+        "_routing": {
+          "lgpd_mode": true,
+          "pii_detected": true,
+          "force_cloud": false,
+          "force_local": false
+        },
+        "success": true
+      },
+      "error": null,
+      "route_used": null,
+      "lgpd_compliant": true,
+      "latency_ms": 29628.273010253906,
+      "pii_detected": true,
+      "cache_hit": false,
+      "metadata": {
+        "provider": null,
+        "eval_iterations": 3
+      }
+    },
+    {
+      "incident_id": "TEST-PII-002",
+      "success": false,
+      "diagnosis": null,
+      "error": "Error code: 404 - {'error': {'message': \"model 'gemma2:27b' not found\", 'type': 'not_found_error', 'param': None, 'code': None}}",
+      "route_used": null,
+      "lgpd_compliant": false,
+      "latency_ms": 11158.896923065186,
+      "pii_detected": false,
+      "cache_hit": false,
+      "metadata": {
+        "provider": null,
+        "eval_iterations": null
+      }
+    },
+    {
+      "incident_id": "TEST-ERR-003",
+      "success": true,
+      "diagnosis": {
+        "incident_id": "TEST-ERR-003",
+        "evento": "—",
+        "codigo_erro": "",
+        "severidade": "MÉDIO",
+        "causa_raiz": "❌ Todos os providers LLM falharam. Verifique as API keys (GROQ_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY) e a conectividade de rede.",
+        "confianca": "MÉDIA",
+        "fonte": "PARSE_ERROR",
+        "passos_resolucao": [
+          "Análise manual necessária — diagnóstico automático falhou."
+        ],
+        "validacao": "Verificar manualmente com especialista eSocial.",
+        "tempo_estimado": "Indefinido",
+        "referencias_kb": [],
+        "alerta_hitl": "Diagnóstico automático falhou — revisão humana obrigatória antes de qualquer ação.",
+        "fonte_kb_id": "",
+        "_meta": {
+          "retrieval_backend": "chromadb",
+          "candidates_retrieved": 5,
+          "candidates_relevant": 0,
+          "query_used": "",
+          "logprob_sim": 0.5,
+          "eval_iterations": 3,
+          "eval_final_verdict": "APPROVED",
+          "eval_criteria_passed": [
+            "causal_coherence",
+            "resolution_actionability",
+            "kb_grounding",
+            "schema_completeness",
+            "severity_calibration"
+          ],
+          "eval_criteria_failed": [],
+          "eval_critique_last": "Avaliador não pôde ser executado — diagnóstico aceito por exaustão de tentativas.",
+          "eval_score_history": [
+            {
+              "iteration": 0,
+              "verdict": "REJECTED",
+              "criteria_passed": [],
+              "criteria_failed": [
+                "causal_coherence",
+                "resolution_actionability",
+                "kb_grounding",
+                "schema_completeness",
+                "severity_calibration"
+              ]
+            },
+            {
+              "iteration": 1,
+              "verdict": "REJECTED",
+              "criteria_passed": [],
+              "criteria_failed": [
+                "causal_coherence",
+                "resolution_actionability",
+                "kb_grounding",
+                "schema_completeness",
+                "severity_calibration"
+              ]
+            },
+            {
+              "iteration": 2,
+              "verdict": "APPROVED",
+              "criteria_passed": [
+                "causal_coherence",
+                "resolution_actionability",
+                "kb_grounding",
+                "schema_completeness",
+                "severity_calibration"
+              ],
+              "criteria_failed": []
+            }
+          ],
+          "reflexion_triggered": true,
+          "reflexion_trigger_reason": "BAIXA_CONFIANCA",
+          "reflexion_iterations": 1,
+          "reflexion_history": [
+            {
+              "iteration": 0,
+              "reflection_text": "❌ Todos os providers LLM falharam. Verifique as API keys (GROQ_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY) e a conectividade de rede.",
+              "eval_verdict_before": "REJECTED",
+              "criteria_failed": [
+                "causal_coherence",
+                "resolution_actionability",
+                "kb_grounding",
+                "schema_completeness",
+                "severity_calibration"
+              ]
+            }
+          ]
+        },
+        "versao_kb": "59537bb138d54ca678fbde17889e24430d16123e2038cf09777f8ddf14301242",
+        "_routing": {
+          "lgpd_mode": true,
+          "pii_detected": true,
+          "force_cloud": false,
+          "force_local": false
+        },
+        "success": true
+      },
+      "error": null,
+      "route_used": null,
+      "lgpd_compliant": true,
+      "latency_ms": 14692.404508590698,
+      "pii_detected": true,
+      "cache_hit": false,
+      "metadata": {
+        "provider": null,
+        "eval_iterations": 3
+      }
+    }
+  ],
+  "timestamp": "2026-04-11T16:44:15.910691"
+}

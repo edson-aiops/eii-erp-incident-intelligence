@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # Aplicação EII
+  eii-app:
+    build: .
+    container_name: eii-dashboard
+    ports:
+      - "7860:7860"
+    environment:
+      # Secrets via Credential Manager no host ou variáveis de ambiente
+      - EII_ADMIN_USER=${EII_ADMIN_USER:-admin}
+      - EII_ADMIN_PASS=${EII_ADMIN_PASS:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY:-}
+      # Configurações do sistema
+      - OLLAMA_BASE_URL=http://ollama:11434/v1
+      - EII_RETRIEVAL_BACKEND=chromadb
+      - LGPD_MODE=true
+    volumes:
+      # Persistência de dados locais
+      - .//app/data
+      # Mount do Credential Manager (Windows)
+      - type: bind
+        source: C:\Users\${USER}\AppData\Local\Microsoft\Credentials
+        target: /mnt/credentials
+        read_only: true
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - eii-network
+
+  # Ollama para inferência local (opcional: pode usar Ollama do host)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: eii-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - eii-network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+# Volumes persistentes
+volumes:
+  ollama_models:
+    driver: local
+
+# Rede isolada para os serviços
+networks:
+  eii-network:
+    driver: bridge

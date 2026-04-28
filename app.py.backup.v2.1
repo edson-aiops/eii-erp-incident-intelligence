@@ -1,6 +1,6 @@
 """
-EII — ERP Incident Intelligence (SECURE VERSION v2.2)
-Dashboard Gradio com Autenticação + Pipeline CRAG + SmartRouter Opcional + Observability
+EII — ERP Incident Intelligence (SECURE VERSION v2.1)
+Dashboard Gradio com Autenticação + Pipeline CRAG + Fallback Ollama + Observability
 """
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -73,13 +73,17 @@ Antes de prosseguir com o envio, confirme:
 # LANGSMITH OBSERVABILITY (Graceful Integration)
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Configura variáveis de ambiente para LangChain/LangSmith se ativado
 if os.getenv("LANGCHAIN_TRACING_V2", "").lower() == "true":
     os.environ["LANGCHAIN_TRACING_V2"] = "true"
     os.environ["LANGCHAIN_PROJECT"] = os.getenv("LANGCHAIN_PROJECT", "eii-erp-v2")
     os.environ["LANGCHAIN_ENDPOINT"] = os.getenv("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
 
 def ls_trace(name: str):
-    """Decorador seguro: aplica @traceable apenas se LangSmith estiver configurado."""
+    """
+    Decorador seguro: aplica @traceable apenas se LangSmith estiver configurado.
+    Degrada gracefully se a biblioteca não estiver instalada ou sem chave.
+    """
     def decorator(func):
         if os.getenv("LANGCHAIN_API_KEY"):
             try:
@@ -91,23 +95,8 @@ def ls_trace(name: str):
             except Exception as e:
                 print(f"⚠️ [LangSmith] Error setting up trace for '{name}': {e}")
                 return func
-        return func
+        return func  # Sem chave → sem tracing, app continua normal
     return decorator
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SMARTROUTER INTEGRATION (Optional - Graceful Fallback)
-# ─────────────────────────────────────────────────────────────────────────────
-
-SMARTROUTER_AVAILABLE = False
-try:
-    # Importa apenas a função de diagnóstico do pipeline com SmartRouter
-    from crag_pipeline_smartrouter import diagnosticar_incidente as diagnosticar_incidente_sr
-    SMARTROUTER_AVAILABLE = True
-    print("✅ SmartRouter v2 loaded successfully")
-except ImportError as e:
-    print(f"⚠️ SmartRouter not available: {e}. Using standard pipeline.")
-    # Fallback: usa o pipeline padrão que já funciona
-    from crag_pipeline import diagnosticar_incidente as diagnosticar_incidente_sr
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Configurações Globais
@@ -141,6 +130,12 @@ def get_config_with_fallback(key: str, default: str = None) -> Optional[str]:
             pass
     
     return default or os.getenv(key)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Imports do Projeto
+# ─────────────────────────────────────────────────────────────────────────────
+
+from crag_pipeline import diagnosticar_incidente
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURAÇÃO DE SEGURANÇA
@@ -189,7 +184,7 @@ def log_secure(user_id: str, action: str, incident_id: Optional[str] = None, ext
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     safe_extra = ""
     if extra:
-        safe_keys = ["route", "backend", "force_local", "mentor_mode", "use_smartrouter"]
+        safe_keys = ["route", "backend", "force_local", "mentor_mode"]
         safe_extra = " | ".join(f"{k}={extra[k]}" for k in safe_keys if k in extra)
     incident_safe = f" | incident={incident_id}" if incident_id else ""
     print(f"[{timestamp}] user={user_id} | action={action}{incident_safe}{f' | {safe_extra}' if safe_extra else ''}")
@@ -295,15 +290,7 @@ def format_output(result: dict, route_used: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @ls_trace("eii.diagnose_handler_secure")
-def diagnose_handler_secure(
-    xml: str, 
-    inc_id: str, 
-    err_code: str, 
-    mentor: bool, 
-    force_local: bool,
-    session_token: str,
-    use_smartrouter: bool = False
-) -> tuple[str, str]:
+def diagnose_handler_secure(xml: str, inc_id: str, err_code: str, mentor: bool, force_local: bool, session_token: str) -> tuple[str, str]:
     if not session_token or not is_session_valid(session_token):
         log_secure("unknown", "diagnose_attempt_failed", reason="invalid_session")
         return "", "❌ Sessão expirada ou inválida. Faça login novamente."
@@ -320,14 +307,10 @@ def diagnose_handler_secure(
         log_secure(user_id, "diagnose_attempt_failed", incident_id=inc_id, reason="empty_xml")
         return "", "⚠️ Por favor, cole o conteúdo do XML antes de diagnosticar."
     
-    log_secure(user_id, "diagnose_started", incident_id=inc_id, extra={
-        "force_local": force_local, 
-        "mentor_mode": mentor,
-        "use_smartrouter": use_smartrouter
-    })
+    log_secure(user_id, "diagnose_started", incident_id=inc_id, extra={"force_local": force_local, "mentor_mode": mentor})
     
     try:
-        resultado = _diagnose_internal(xml, inc_id, err_code, mentor, force_local, use_smartrouter)
+        resultado = _diagnose_internal(xml, inc_id, err_code, mentor, force_local)
         log_secure(user_id, "diagnose_completed", incident_id=inc_id, extra={"remaining_requests": remaining})
         return resultado, ""
     except Exception as e:
@@ -335,8 +318,8 @@ def diagnose_handler_secure(
         return "", f"💥 Erro interno: {type(e).__name__}"
 
 @ls_trace("eii.diagnose_internal")
-def _diagnose_internal(xml: str, inc_id: str, err_code: str, mentor: bool, force_local: bool, use_smartrouter: bool = False) -> str:
-    # 1. Forçar Local (Ollama) - prioridade máxima para LGPD
+def _diagnose_internal(xml: str, inc_id: str, err_code: str, mentor: bool, force_local: bool) -> str:
+    # 1. Forçar Local (Ollama)
     if force_local:
         print(f"🏭 [DEBUG] Forçando uso do Ollama local para {inc_id}...")
         try:
@@ -366,38 +349,26 @@ def _diagnose_internal(xml: str, inc_id: str, err_code: str, mentor: bool, force
         except Exception as e:
             return f"💥 Erro ao chamar Ollama: {str(e)}"
     
-    # 2. Pipeline principal (SmartRouter ou padrão)
-    pipeline_name = "SmartRouter" if (use_smartrouter and SMARTROUTER_AVAILABLE) else "padrão"
-    print(f"☁️ [DEBUG] Usando pipeline {pipeline_name} para {inc_id}...")
-    
+    # 2. Pipeline CRAG (Cloud)
+    print(f"☁️ [DEBUG] Tentando providers cloud primeiro para {inc_id}...")
     try:
-        main_result = diagnosticar_incidente_sr(
-            xml_content=xml,
-            incident_id=inc_id,
-            error_code=err_code,
-            mentor_mode=mentor,
-            force_local=False  # Já tratamos force_local acima
-        )
-        
-        # Verificar se foi sucesso real
+        main_result = diagnosticar_incidente(xml_content=xml, incident_id=inc_id, error_code=err_code, mentor_mode=mentor)
         error_msg = str(main_result.get("error", "")).lower()
         is_api_error = any(x in error_msg for x in ["provedores falharam", "api key", "401", "invalid", "incorrect"])
         
         if main_result.get("success") and not is_api_error:
             route = main_result.get("_routing", {}).get("route_used", "auto")
-            route_label = f"smartrouter:{route}" if (use_smartrouter and SMARTROUTER_AVAILABLE) else route
-            print(f"✅ [DEBUG] Pipeline funcionou! Rota: {route_label}")
-            formatted_output = format_output(main_result, route_label)
+            print(f"✅ [DEBUG] Pipeline principal funcionou! Rota: {route}")
+            formatted_output = format_output(main_result, route)
             if mentor:
                 formatted_output = apply_mentor_mode(formatted_output, True)
             return formatted_output
         
-        print(f"⚠️ [DEBUG] Pipeline falhou ({error_msg[:100]}...), tentando fallback Ollama...")
-        
+        print(f"⚠️ [DEBUG] Pipeline falhou ({error_msg[:100]}...), tentando Ollama local...")
     except Exception as e:
         print(f"💥 [DEBUG] Exceção no pipeline principal: {e}")
     
-    # 3. Fallback para Ollama
+    # 3. Fallback Ollama
     print(f"🏭 [DEBUG] Ativando fallback Ollama para {inc_id}...")
     try:
         fallback = call_ollama_direct(xml, inc_id)
@@ -419,7 +390,7 @@ def _diagnose_internal(xml: str, inc_id: str, err_code: str, mentor: bool, force
     except Exception as e:
         print(f"💥 [DEBUG] Exceção no fallback: {e}")
     
-    return "💥 Erro crítico: Nenhum pipeline respondeu. Verifique os logs."
+    return "💥 Erro crítico: Nem cloud nem Ollama local responderam. Verifique os logs."
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Funções da Interface
@@ -484,15 +455,6 @@ with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Defaul
                 with gr.Row():
                     mentor_mode = gr.Checkbox(label="🎓 Modo Mentor + Checklist HITL", value=False)
                     force_local = gr.Checkbox(label="🏭 Forçar Local (Ollama)", value=False)
-                    # Checkbox SmartRouter só aparece se disponível
-                    if SMARTROUTER_AVAILABLE:
-                        use_smartrouter = gr.Checkbox(
-                            label="🧠 Usar SmartRouter (Avançado)", 
-                            value=False,
-                            info="Roteamento inteligente multi-LLM com fallback resiliente"
-                        )
-                    else:
-                        use_smartrouter = gr.State(False)
                 
                 diagnose_btn = gr.Button("🚀 Diagnosticar", variant="primary", size="lg")
             
@@ -505,11 +467,7 @@ with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Defaul
     # Event Handlers
     login_btn.click(fn=login_page, inputs=[username_input, password_input], outputs=[login_msg, session_token, current_user, login_container, main_interface]).then(fn=get_user_display, inputs=[current_user], outputs=[user_info])
     logout_btn.click(fn=logout, inputs=[session_token], outputs=[login_container, main_interface]).then(fn=lambda: ("", ""), outputs=[session_token, current_user])
-    diagnose_btn.click(
-        fn=diagnose_handler_secure,
-        inputs=[xml_input, incident_id, error_code, mentor_mode, force_local, session_token, use_smartrouter],
-        outputs=[output, error_output]
-    ).then(fn=lambda err: gr.update(visible=bool(err and err.strip())), inputs=[error_output], outputs=[error_output])
+    diagnose_btn.click(fn=diagnose_handler_secure, inputs=[xml_input, incident_id, error_code, mentor_mode, force_local, session_token], outputs=[output, error_output]).then(fn=lambda err: gr.update(visible=bool(err and err.strip())), inputs=[error_output], outputs=[error_output])
     demo.load(fn=get_user_display, inputs=[current_user], outputs=[user_info])
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -518,12 +476,8 @@ with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Defaul
 
 if __name__ == "__main__":
     os.environ["GRADIO_ANALYTICS_ENABLED"] = "false"
-    print("🚀 Iniciando EII Dashboard v2.2 (Mentor + SmartRouter + Observability)...")
+    print("🚀 Iniciando EII Dashboard v2.1 (Mentor + Observability)...")
     print(f"📊 Acesse: http://127.0.0.1:7860")
     print(f"🔐 Login: usa Credential Manager ou .env")
     print(f"🛡️ Segurança: Rate limit={RATE_LIMIT_REQUESTS}req/{RATE_LIMIT_WINDOW}s | Session timeout={SESSION_TIMEOUT_MINUTES}min")
-    if SMARTROUTER_AVAILABLE:
-        print("🧠 SmartRouter: Disponível (marque o checkbox para usar)")
-    else:
-        print("⚠️ SmartRouter: Não disponível (usando pipeline padrão)")
     demo.launch(server_name="127.0.0.1", server_port=7860, quiet=True)

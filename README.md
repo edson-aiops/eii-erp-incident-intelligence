@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![HuggingFace Space](https://img.shields.io/badge/🤗_HuggingFace-Demo_Pública-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)](https://huggingface.co/spaces/EdsonPO/eii-incident-intelligence)
+[![HuggingFace Space](https://img.shields.io/badge/🤗_HuggingFace-Demo_Pública-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)](https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence)
 [![Python](https://img.shields.io/badge/Python-3.13-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge)](LICENSE)
 [![LGPD](https://img.shields.io/badge/LGPD-Privacy_by_Design-009B7D?style=for-the-badge)](https://www.gov.br/lgpd)
@@ -23,18 +23,18 @@
 
 ## Índice / Table of Contents
 
-- [🇧🇷 Versão em Português](#-versão-em-português)
+- [🇧🇷 Versão em Português](#versao-em-portugues)
   - [O Problema](#o-problema)
-  - [Como Funciona na Prática](#como-funciona-na-prática)
+  - [Como Funciona na Prática](#como-funciona-na-pratica)
   - [Exemplo Real de Uso](#exemplo-real-de-uso)
-  - [Demo Pública vs Versão Local](#demo-pública-vs-versão-local)
+  - [Demo Pública vs Versão Local](#demo-publica-vs-versao-local)
   - [Arquitetura Detalhada](#arquitetura-detalhada)
   - [Como Rodar Localmente](#como-rodar-localmente)
-  - [Stack Tecnológica](#stack-tecnológica)
-  - [Métricas e Impacto de Negócio](#métricas-e-impacto-de-negócio)
+  - [Stack Tecnológica](#stack-tecnologica)
+  - [Métricas e Impacto de Negócio](#metricas-e-impacto-de-negocio)
   - [Roadmap](#roadmap)
-  - [Documentação Relacionada](#documentação-relacionada)
-- [🇬🇧 English Version](#-english-version)
+  - [Documentação Relacionada](#documentacao-relacionada)
+- [🇬🇧 English Version](#english-version)
   - [The Problem](#the-problem)
   - [How It Works](#how-it-works)
   - [Real Usage Example](#real-usage-example)
@@ -42,15 +42,15 @@
   - [Detailed Architecture](#detailed-architecture)
   - [Running Locally](#running-locally)
   - [Technology Stack](#technology-stack)
-  - [Metrics & Business Impact](#metrics--business-impact)
-  - [Roadmap (EN)](#roadmap-en)
-- [👨‍💻 Sobre o Desenvolvedor / About the Developer](#-sobre-o-desenvolvedor--about-the-developer)
-- [📄 Licença / License](#-licença--license)
-- [📞 Suporte e Contribuição / Support & Contribution](#-suporte-e-contribuição--support--contribution)
+  - [Metrics and Business Impact](#metrics-and-business-impact)
+  - [Roadmap EN](#roadmap-en)
+- [👨‍💻 Sobre o Desenvolvedor / About the Developer](#sobre-o-desenvolvedor--about-the-developer)
+- [📄 Licença / License](#licenca--license)
+- [📞 Suporte e Contribuição / Support and Contribution](#suporte-e-contribuicao--support-and-contribution)
 
 ---
 
-## 🇧🇷 Versão em Português
+## Versão em Português
 
 ### O Problema
 
@@ -59,7 +59,7 @@ O **eSocial** é o sistema de escrituração digital das obrigações fiscais, p
 **O cenário atual nas empresas:**
 
 | Situação | Realidade |
-|----------|-----------|
+| --- | --- |
 | Tempo médio de diagnóstico | **15 a 45 minutos** por rejeição |
 | Volume mensal de rejeições | Dezenas a centenas por empresa de médio porte |
 | Custo por analista/hora | R$ 50–120/hora (folha + encargos) |
@@ -76,7 +76,7 @@ O analista de RH ou DP recebe o XML rejeitado, precisa identificar o evento (`S-
 
 O EII recebe o XML rejeitado pelo eSocial, detecta automaticamente se há dados pessoais, roteia para o processador correto (local ou nuvem), executa o pipeline CRAG e entrega um diagnóstico estruturado em segundos.
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        EII — FLUXO COMPLETO                         │
 └─────────────────────────────────────────────────────────────────────┘
@@ -100,7 +100,7 @@ O EII recebe o XML rejeitado pelo eSocial, detecta automaticamente se há dados 
      ▼           ▼
  [Ollama]    [Groq API]       ← SmartRouter (3 fases de roteamento)
  Local LLM   Cloud LLM
- Gemma4 26B  Llama 3.3 70B
+ gemma2:2b   Llama 3.3 70B
      │           │
      └─────┬─────┘
            │
@@ -164,7 +164,7 @@ O EII recebe o XML rejeitado pelo eSocial, detecta automaticamente se há dados 
   </evtRemun>
   <Status>
     <cdResposta>401</cdResposta>
-    <descResposta>MA-100: Data de início de vigência inválida</descResposta>
+    <descResposta>MA-100: Data de inicio de vigencia invalida</descResposta>
   </Status>
 </eSocial>
 ```
@@ -179,14 +179,14 @@ O EII recebe o XML rejeitado pelo eSocial, detecta automaticamente se há dados 
   "severidade": "ALTO",
   "confianca": "ALTA",
   "fonte": "KB_MATCH",
-  "causa_raiz": "O campo <dtIniValid> contém competência anterior ao início da obrigatoriedade do empregador no eSocial. O evento S-1200 exige que a competência de início de vigência seja igual ou posterior à data de obrigatoriedade definida pelo grupo do empregador (Grupo 2: 2018-07).",
+  "causa_raiz": "O campo dtIniValid contem competencia anterior ao inicio da obrigatoriedade do empregador no eSocial. O evento S-1200 exige que a competencia de inicio de vigencia seja igual ou posterior a data de obrigatoriedade definida pelo grupo do empregador (Grupo 2: 2018-07).",
   "passos_resolucao": [
     "1. Verificar a data de obrigatoriedade do empregador no Portal eSocial",
-    "2. Corrigir o campo <dtIniValid> para a competência correta",
+    "2. Corrigir o campo dtIniValid para a competencia correta",
     "3. Reenviar o evento S-1200 com o campo corrigido",
-    "4. Validar no portal eSocial que o retorno é 201 (Sucesso)"
+    "4. Validar no portal eSocial que o retorno e 201 (Sucesso)"
   ],
-  "alerta_hitl": "Verifique se há eventos S-1200 anteriores com o mesmo CNPJ que precisam de retificação (indRetif=2)",
+  "alerta_hitl": "Verifique se ha eventos S-1200 anteriores com o mesmo CNPJ que precisam de retificacao (indRetif=2)",
   "_meta": {
     "logprob_sim": 0.94,
     "eval_iterations": 1,
@@ -203,8 +203,8 @@ O EII recebe o XML rejeitado pelo eSocial, detecta automaticamente se há dados 
 ### Demo Pública vs Versão Local
 
 | Característica | 🌐 Demo HuggingFace | 💻 Versão Local |
-|----------------|---------------------|-----------------|
-| URL | [spaces/EdsonPO/eii-incident-intelligence](https://huggingface.co/spaces/EdsonPO/eii-incident-intelligence) | `http://localhost:7860` |
+| --- | --- | --- |
+| URL | [huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence](https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence) | `http://localhost:7860` |
 | Arquivo | `app_hf.py` | `app.py` |
 | LLM | Groq Cloud (dados anonimizados) | Ollama local (LGPD) + Groq fallback |
 | PII handling | Scrubbing antes do envio | Processamento 100% local |
@@ -240,17 +240,17 @@ campos = parser.extract_fields(xml)       # {"dtIniValid": "2017-01", ...}
 Aplica regex calibrada para detecção de PII (Personally Identifiable Information) conforme LGPD:
 
 | Tipo de PII | Regex Pattern | Ação |
-|-------------|---------------|------|
-| CPF | `\d{3}\.?\d{3}\.?\d{3}-?\d{2}` | → Ollama local |
-| CNPJ | `\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}` | → Scrub + Cloud |
-| NIS/PIS | `\d{3}\.?\d{5}\.?\d{2}-?\d` | → Ollama local |
-| Nome completo | Heurística + contexto | → Scrub |
+| --- | --- | --- |
+| CPF | `\d{3}\.?\d{3}\.?\d{3}-?\d{2}` | Ollama local |
+| CNPJ | `\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}` | Scrub + Cloud |
+| NIS/PIS | `\d{3}\.?\d{5}\.?\d{2}-?\d` | Ollama local |
+| Nome completo | Heurística + contexto | Scrub |
 
 #### Módulo 3: `smartrouter/` — Orquestração Multi-LLM
 
 O SmartRouter implementa 3 fases de roteamento:
 
-```
+```text
 Fase 1: Rules Engine
   ├── PII detectado? → Ollama (local, LGPD)
   ├── Evento crítico S-5001/S-5003? → Claude Haiku
@@ -266,7 +266,8 @@ Fase 3: Adaptive Routing
 ```
 
 **ResilientLLM** — Circuit Breaker em cascata:
-```
+
+```text
 Groq (primário)
   └── Falha 3x em 10min? → Claude Haiku (secundário)
         └── Falha? → GPT-4o-mini (terciário)
@@ -278,7 +279,7 @@ Groq (primário)
 O coração do EII. Implementa **Corrective RAG** com 6 agentes em sequência:
 
 | Agente | Função | ADR |
-|--------|---------|-----|
+| --- | --- | --- |
 | `Retriever` | Busca vetorial no Qdrant (73 itens, 384 dims) | — |
 | `RelevanceCheck` | Filtra documentos irrelevantes com LLM judge | — |
 | `DiagnosticAgent` | Gera causa raiz + passos de resolução | ADR-001 |
@@ -288,7 +289,7 @@ O coração do EII. Implementa **Corrective RAG** com 6 agentes em sequência:
 
 **ADR-001 — EvaluatorAgent:** 5 critérios avaliados (precisão técnica, acionabilidade, cobertura, clareza, risco), threshold de 80% para aprovação automática. 13 testes unitários.
 
-**ADR-002 — Reflexion:** Quando EvaluatorAgent reprova, o pipeline envia o diagnóstico + crítica de volta ao DiagnosticAgent para auto-correção. Máximo 2 iterações (MAX_ITER=2). 13 testes unitários.
+**ADR-002 — Reflexion:** Quando EvaluatorAgent reprova, o pipeline envia o diagnóstico + crítica de volta ao DiagnosticAgent para auto-correção. Máximo 2 iterações (`MAX_ITER=2`). 13 testes unitários.
 
 #### Módulo 5: `observability.py` — LangSmith OBS-001
 
@@ -308,7 +309,7 @@ Metadados capturados por run: `esocial_evento`, `codigo_erro`, `analista_id`, `v
 
 Expõe o EII como servidor MCP, permitindo que Claude e outros agentes LLM chamem o pipeline diretamente:
 
-```
+```text
 Tool: eii_query(xml_rejeicao: str) → dict
   └── Executa pipeline CRAG completo, persiste como PENDING
 
@@ -356,24 +357,24 @@ python app.py
 #### Variáveis de Ambiente (`.env`)
 
 ```env
-# ─── LLMs ─────────────────────────────────────────────────────
-GROQ_API_KEY=gsk_...              # Obrigatório — LLM principal
-ANTHROPIC_API_KEY=sk-ant-...      # Opcional — fallback Claude Haiku
-OPENAI_API_KEY=sk-...             # Opcional — fallback GPT-4o-mini
+# LLMs
+GROQ_API_KEY=gsk_...
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
 
-# ─── Vetorização ─────────────────────────────────────────────
-QDRANT_URL=https://xxx.qdrant.io  # Opcional — padrão: ChromaDB local
-QDRANT_API_KEY=eyJ...             # Obrigatório se QDRANT_URL definido
-EII_RETRIEVAL_BACKEND=qdrant      # "qdrant" | "chromadb"
+# Vetorização
+QDRANT_URL=https://xxx.qdrant.io
+QDRANT_API_KEY=eyJ...
+EII_RETRIEVAL_BACKEND=qdrant
 
-# ─── Observabilidade ─────────────────────────────────────────
-LANGSMITH_API_KEY=lsv2_...        # Opcional — tracing OBS-001
-LANGSMITH_PROJECT=eii-brasil      # Nome do projeto LangSmith
+# Observabilidade
+LANGSMITH_API_KEY=lsv2_...
+LANGSMITH_PROJECT=eii-brasil
 
-# ─── Segurança ───────────────────────────────────────────────
-DB_PATH=/data/eii.db              # Caminho SQLite (padrão: ./eii.db)
+# Segurança
+DB_PATH=/data/eii.db
 
-# ─── Ollama (LGPD Mode) ───────────────────────────────────────
+# Ollama (LGPD Mode)
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=gemma2:2b
 ```
@@ -415,10 +416,10 @@ python -c "from crag_pipeline import run_crag; print('OK')"
 
 ### Stack Tecnológica
 
-#### Backend & Aplicação
+#### Backend e Aplicação
 
 | Tecnologia | Versão | Papel |
-|------------|--------|-------|
+| --- | --- | --- |
 | Python | 3.13 | Runtime principal |
 | Gradio | 4.44.0 | Interface web (UI + API) |
 | FastAPI | integrado | Endpoints REST via Gradio |
@@ -429,20 +430,20 @@ python -c "from crag_pipeline import run_crag; print('OK')"
 #### IA / ML / LLMs
 
 | Tecnologia | Versão | Papel |
-|------------|--------|-------|
+| --- | --- | --- |
 | LangChain Core | ≥0.1.0 | Orchestration framework |
 | LangSmith | ≥0.1.0 | Observabilidade + tracing |
 | sentence-transformers | 3.1.1 | Embeddings (all-MiniLM-L6-v2) |
 | ChromaDB | ≥0.6 | Vector store local |
 | Qdrant Cloud | — | Vector store produção (384 dims, Cosine) |
 | Groq API | ≥1.0.0 | LLM principal (Llama 3.3 70B) |
-| Ollama | local | LLM LGPD (Gemma4 26B / gemma2:2b) |
+| Ollama | local | LLM LGPD (gemma2:2b) |
 | OpenAI SDK | ≥1.0.0 | Fallback GPT-4o-mini |
 
-#### Segurança & Compliance
+#### Segurança e Compliance
 
 | Tecnologia | Papel |
-|------------|-------|
+| --- | --- |
 | SHA-256 | Hash de `analista_id` e `versao_kb` |
 | Regex PII | Detecção CPF/CNPJ/NIS antes do LLM |
 | Ollama local | Processamento LGPD — dados não saem da rede |
@@ -450,13 +451,13 @@ python -c "from crag_pipeline import run_crag; print('OK')"
 | Session Timeout | 30 minutos de inatividade |
 | Graceful Degradation | Fallback em cascata sem perda de dados |
 
-#### Infra & DevOps
+#### Infra e DevOps
 
 | Tecnologia | Papel |
-|------------|-------|
+| --- | --- |
 | Docker | Containerização + HF Spaces deploy |
 | GitHub Actions | CI/CD |
-| HuggingFace Spaces | Demo pública (app_hf.py) |
+| HuggingFace Spaces | Demo pública (`app_hf.py`) |
 | GitHub Codespaces | Ambiente de desenvolvimento cloud |
 | Tenacity | Retry automático com backoff exponencial |
 
@@ -465,16 +466,17 @@ python -c "from crag_pipeline import run_crag; print('OK')"
 ### Métricas e Impacto de Negócio
 
 | Métrica | Antes do EII | Com EII | Melhoria |
-|---------|-------------|---------|----------|
+| --- | --- | --- | --- |
 | Tempo de diagnóstico | 15–45 min | ~2–5 seg | **−97%** |
 | Auto-resolve rate | 0% | ≥70% (alvo) | +70pp |
 | Escalações HITL | 100% | ≤30% (alvo) | −70pp |
 | MTTR (Mean Time to Resolve) | Horas | Minutos | **−70%** |
 | Testes automatizados | 0 | 72 | +72 |
 | Cobertura da KB | Manual | 73 incidentes curados | Estruturada |
-| Confiança do diagnóstico | Subjetiva | `ALTA/MÉDIA/BAIXA` (logprobs) | Mensurável |
+| Confiança do diagnóstico | Subjetiva | `ALTA/MEDIA/BAIXA` (logprobs) | Mensurável |
 
 **Estimativa de economia:**
+
 - 50 rejeições/mês × 30 min × R$ 80/h = **R$ 2.000/mês economizados por empresa**
 - Auto-resolve de 70% = **35 incidentes sem intervenção humana**
 
@@ -482,12 +484,14 @@ python -c "from crag_pipeline import run_crag; print('OK')"
 
 ### Roadmap
 
-#### ✅ Phase 1 — Foundation (Concluída)
+#### Phase 1 — Foundation (Concluída ✅)
+
 - [x] Gradio UI + Docker + HuggingFace Spaces deploy
-- [x] Estrutura de projeto + CLAUDE.md
+- [x] Estrutura de projeto + `CLAUDE.md`
 - [x] Pipeline CRAG base com ChromaDB
 
-#### ✅ Phase 2 — Core Intelligence (Concluída)
+#### Phase 2 — Core Intelligence (Concluída ✅)
+
 - [x] Knowledge Base com 73 incidentes eSocial curados
 - [x] EvaluatorAgent com threshold 80% (ADR-001)
 - [x] Reflexion auto-correção (ADR-002)
@@ -496,20 +500,22 @@ python -c "from crag_pipeline import run_crag; print('OK')"
 - [x] SQLite persistence + audit trail
 - [x] Suite de 72 testes automatizados
 
-#### ✅ Phase 3 — Production (Concluída)
+#### Phase 3 — Production (Concluída ✅)
+
 - [x] Qdrant Cloud backend (384 dims, all-MiniLM-L6-v2, Cosine)
 - [x] SmartRouter multi-LLM (9 providers, 3 fases)
-- [x] ResilientLLM circuit breaker (Groq→Claude→GPT)
-- [x] LGPD Mode — Ollama/Gemma4 local inference
+- [x] ResilientLLM circuit breaker (Groq → Claude → GPT)
+- [x] LGPD Mode — Ollama/gemma2:2b local inference
 - [x] MCP Server via fastmcp (`eii_query`, `eii_escalate`)
 - [x] Batch processing ThreadPoolExecutor
 - [x] Mentor Mode + HITL 3-checkbox
-- [x] LangSmith @traceable OBS-001
+- [x] LangSmith `@traceable` OBS-001
 - [x] Dev Container para GitHub Codespaces
 - [x] E2E smoke test contra HF Space
 - [x] LangChain adapter (`SmartRouterLLM` extends `BaseChatModel`)
 
-#### 🔄 Phase 4 — Deep Agents (Em Progresso)
+#### Phase 4 — Deep Agents (Em Progresso 🔄)
+
 - [ ] Migração para `create_deep_agent` (Deep Agents v0.5)
 - [ ] Fork-Join assíncrono: 1 subagent por evento eSocial no Lote
 - [ ] MCP tools nativos via Deep Agents (`eii_query`, `eii_escalate`)
@@ -517,7 +523,8 @@ python -c "from crag_pipeline import run_crag; print('OK')"
 - [ ] Git worktrees para ring-fencing por evento
 - [ ] Claude Code Skills: `/eii-diagnose`, `/eii-ingest`, `/eii-audit`
 
-#### ⏳ Phase 5 — Enterprise Observability (Planejada)
+#### Phase 5 — Enterprise Observability (Planejada ⏳)
+
 - [ ] LangSmith dashboards com métricas de produção
 - [ ] S3 parquet — retenção 5 anos (CLT art.11)
 - [ ] API `/audit/traces` para auditoria
@@ -530,7 +537,7 @@ python -c "from crag_pipeline import run_crag; print('OK')"
 ### Documentação Relacionada
 
 | Documento | Descrição |
-|-----------|-----------|
+| --- | --- |
 | [`docs/PRD.md`](docs/PRD.md) | Product Requirements Document completo (FR/NFR/ADR/métricas) |
 | [`CHANGELOG.md`](CHANGELOG.md) | Histórico completo de releases (Phase 1–3) |
 | [`CLAUDE.md`](CLAUDE.md) | Contexto para Claude Code — arquitetura, MCP, comandos |
@@ -543,7 +550,7 @@ python -c "from crag_pipeline import run_crag; print('OK')"
 
 ---
 
-## 🇬🇧 English Version
+## English Version
 
 ### The Problem
 
@@ -552,10 +559,10 @@ python -c "from crag_pipeline import run_crag; print('OK')"
 **Current state in enterprises:**
 
 | Situation | Reality |
-|-----------|---------|
+| --- | --- |
 | Average diagnosis time | **15 to 45 minutes** per rejection |
 | Monthly rejection volume | Dozens to hundreds per mid-size company |
-| Analyst cost/hour | R$ 50–120/hr (salary + charges) |
+| Analyst cost per hour | R$ 50–120/hr (salary + charges) |
 | Penalty risk per event | Up to R$ 1,812.87 |
 | Data in XML | CPF, CNPJ, NIS, salaries — **LGPD-sensitive data** |
 
@@ -569,7 +576,7 @@ HR/DP analysts receive rejected XMLs, must identify the event type (`S-1200`, `S
 
 EII receives the rejected XML, automatically detects personal data, routes to the correct processor (local or cloud), runs the CRAG pipeline, and delivers a structured diagnosis in seconds.
 
-```
+```text
 [eSocial Rejected XML]
         │
         ▼
@@ -581,8 +588,8 @@ EII receives the rejected XML, automatically detects personal data, routes to th
      ┌──┴──┐
   PII Found  PII Clean
      │           │
-  [Ollama]   [Groq API]    ←  SmartRouter (3 routing phases)
-  Local LLM  Cloud LLM
+  [Ollama]   [Groq API]    ← SmartRouter (3 routing phases)
+  gemma2:2b  Llama 3.3 70B
      │           │
      └─────┬─────┘
            │
@@ -623,10 +630,10 @@ EII receives the rejected XML, automatically detects personal data, routes to th
   "severidade": "ALTO",
   "confianca": "ALTA",
   "fonte": "KB_MATCH",
-  "causa_raiz": "The <dtIniValid> field contains a period prior to the employer's eSocial enrollment date. Event S-1200 requires the validity start date to be equal to or later than the employer group's mandatory enrollment date.",
+  "causa_raiz": "The dtIniValid field contains a period prior to the employer eSocial enrollment date. Event S-1200 requires the validity start date to be equal to or later than the employer group mandatory enrollment date.",
   "passos_resolucao": [
     "1. Check employer enrollment date at the eSocial Portal",
-    "2. Correct the <dtIniValid> field to the valid competency period",
+    "2. Correct the dtIniValid field to the valid competency period",
     "3. Resubmit S-1200 with the corrected field",
     "4. Validate that the portal returns HTTP 201 (Success)"
   ],
@@ -643,8 +650,8 @@ EII receives the rejected XML, automatically detects personal data, routes to th
 ### Public Demo vs Local Version
 
 | Feature | 🌐 HuggingFace Demo | 💻 Local Version |
-|---------|---------------------|-----------------|
-| URL | [spaces/EdsonPO/eii-incident-intelligence](https://huggingface.co/spaces/EdsonPO/eii-incident-intelligence) | `http://localhost:7860` |
+| --- | --- | --- |
+| URL | [huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence](https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence) | `http://localhost:7860` |
 | Entry file | `app_hf.py` | `app.py` |
 | LLM | Groq Cloud (anonymized data) | Ollama local (LGPD) + Groq fallback |
 | PII handling | Scrubbed before sending | 100% local processing |
@@ -659,7 +666,7 @@ EII receives the rejected XML, automatically detects personal data, routes to th
 #### CRAG Pipeline — 6 Agents
 
 | Agent | Function | Design Decision |
-|-------|----------|-----------------|
+| --- | --- | --- |
 | `Retriever` | Vector search in Qdrant (73 items, 384 dims) | Cosine similarity |
 | `RelevanceCheck` | Filters irrelevant docs with LLM judge | Binary grade |
 | `DiagnosticAgent` | Generates root cause + resolution steps | ADR-001 |
@@ -670,7 +677,7 @@ EII receives the rejected XML, automatically detects personal data, routes to th
 #### SmartRouter — 9 LLM Providers
 
 | Provider | Specialty | Mode |
-|----------|-----------|------|
+| --- | --- | --- |
 | Groq / Llama 3.3 70B | Primary — speed + accuracy | Cloud |
 | Claude Haiku | Architecture decisions | Cloud |
 | Kimi K2 | Complex coding | Cloud |
@@ -679,11 +686,11 @@ EII receives the rejected XML, automatically detects personal data, routes to th
 | Qwen QwQ-32B | Complex reasoning | Cloud |
 | DeepSeek R1 | Technical analysis | Cloud |
 | Mistral Large 3 | Multilingual | Cloud |
-| Ollama / Gemma4 26B | **LGPD mode — local inference** | **Local** |
+| Ollama / gemma2:2b | **LGPD mode — local inference** | **Local** |
 
 #### ResilientLLM — Circuit Breaker
 
-```
+```text
 Groq (primary)
   └── 3 failures in 10min? → Claude Haiku (secondary)
         └── Failure? → GPT-4o-mini (tertiary)
@@ -693,13 +700,12 @@ Groq (primary)
 #### MCP Server Integration
 
 ```json
-// claude_desktop_config.json
 {
   "mcpServers": {
     "eii": {
       "command": "python",
       "args": ["/path/to/eii-erp-incident-intelligence/mcp_server.py"],
-      "env": { "GROQ_API_KEY": "your-key-here" }
+      "env": {"GROQ_API_KEY": "your-key-here"}
     }
   }
 }
@@ -716,13 +722,13 @@ cd eii-erp-incident-intelligence
 
 # Install
 pip install -r requirements.txt
-cp .env.example .env  # Fill in your API keys
+cp .env.example .env
 
 # Optional: LGPD local model
 ollama pull gemma2:2b
 
 # Run
-python app.py  # http://localhost:7860
+python app.py
 
 # Tests (72 tests, zero network calls)
 python -m pytest tests/test_phase2.py -v
@@ -731,13 +737,15 @@ python -m pytest tests/test_phase2.py -v
 #### Environment Variables
 
 ```env
-GROQ_API_KEY=gsk_...                  # Required
-QDRANT_URL=https://xxx.qdrant.io      # Optional (uses ChromaDB by default)
-QDRANT_API_KEY=eyJ...                 # Required if QDRANT_URL is set
-LANGSMITH_API_KEY=lsv2_...            # Optional (tracing)
-EII_RETRIEVAL_BACKEND=qdrant          # "qdrant" | "chromadb"
-ANTHROPIC_API_KEY=sk-ant-...          # Optional (fallback)
-OPENAI_API_KEY=sk-...                 # Optional (fallback)
+GROQ_API_KEY=gsk_...
+QDRANT_URL=https://xxx.qdrant.io
+QDRANT_API_KEY=eyJ...
+LANGSMITH_API_KEY=lsv2_...
+EII_RETRIEVAL_BACKEND=qdrant
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=gemma2:2b
 ```
 
 ---
@@ -745,11 +753,11 @@ OPENAI_API_KEY=sk-...                 # Optional (fallback)
 ### Technology Stack
 
 | Layer | Technologies |
-|-------|-------------|
+| --- | --- |
 | **Runtime** | Python 3.13, Gradio 4.44.0, FastAPI, Pydantic ≥2.0 |
 | **AI/ML** | LangChain, sentence-transformers 3.1.1, LangSmith |
 | **Vector Stores** | Qdrant Cloud (prod), ChromaDB ≥0.6 (dev) |
-| **LLMs** | Groq, Claude Haiku, Ollama/Gemma4, GPT-4o-mini, Qwen, Kimi, Cerebras |
+| **LLMs** | Groq, Claude Haiku, Ollama/gemma2:2b, GPT-4o-mini, Qwen, Kimi, Cerebras |
 | **Storage** | SQLite (audit log), Qdrant (vectors) |
 | **Infra** | Docker, HuggingFace Spaces, GitHub Codespaces |
 | **Agent Protocol** | MCP via fastmcp, LangChain BaseChatModel adapter |
@@ -758,10 +766,10 @@ OPENAI_API_KEY=sk-...                 # Optional (fallback)
 
 ---
 
-### Metrics & Business Impact
+### Metrics and Business Impact
 
 | Metric | Before EII | With EII | Improvement |
-|--------|-----------|---------|-------------|
+| --- | --- | --- | --- |
 | Diagnosis time | 15–45 min | ~2–5 sec | **−97%** |
 | Auto-resolve rate | 0% | ≥70% (target) | +70pp |
 | HITL escalations | 100% | ≤30% (target) | −70pp |
@@ -772,10 +780,10 @@ OPENAI_API_KEY=sk-...                 # Optional (fallback)
 
 ---
 
-### Roadmap (EN)
+### Roadmap EN
 
 | Phase | Status | Deliverables |
-|-------|--------|-------------|
+| --- | --- | --- |
 | **1 — Foundation** | ✅ Done | Gradio UI + Docker + HF Spaces |
 | **2 — Core Intelligence** | ✅ Done | 73-item KB + CRAG + EvaluatorAgent + Reflexion |
 | **3 — Production** | ✅ Done | Qdrant + SmartRouter + MCP + Batch + LGPD |
@@ -784,7 +792,7 @@ OPENAI_API_KEY=sk-...                 # Optional (fallback)
 
 ---
 
-## 👨‍💻 Sobre o Desenvolvedor / About the Developer
+## Sobre o Desenvolvedor / About the Developer
 
 <div align="center">
 
@@ -798,20 +806,22 @@ OPENAI_API_KEY=sk-...                 # Optional (fallback)
 
 [![GitHub](https://img.shields.io/badge/GitHub-edson--aiops-181717?style=for-the-badge&logo=github)](https://github.com/edson-aiops)
 [![HuggingFace](https://img.shields.io/badge/HuggingFace-EdsonPO-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)](https://huggingface.co/EdsonPO)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Edson_Oliveira-0A66C2?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/edson-oliveira)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Edson_Oliveira-0A66C2?style=for-the-badge&logo=linkedin)](https://www.linkedin.com/in/edson-pereira-oliveira)
 
 </div>
 
 ---
 
-## 📄 Licença / License
+## Licença / License
 
 Este projeto é licenciado sob a **MIT License** — você pode usar, copiar, modificar e distribuir livremente, inclusive para fins comerciais, desde que mantenha o aviso de copyright.
 
 *This project is licensed under the **MIT License** — free to use, copy, modify, and distribute, including for commercial purposes, as long as the copyright notice is maintained.*
 
-```
-MIT License — Copyright (c) 2024-2026 Edson Oliveira
+```text
+MIT License
+
+Copyright (c) 2024-2026 Edson Oliveira
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -822,13 +832,21 @@ furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 [Ver licença completa / See full license](LICENSE)
 
 ---
 
-## 📞 Suporte e Contribuição / Support & Contribution
+## Suporte e Contribuição / Support and Contribution
 
 ### Reportar um Bug / Report a Bug
 
@@ -860,12 +878,12 @@ A Knowledge Base aceita contribuições de incidentes eSocial reais (sem PII). U
 
 <div align="center">
 
-[![HuggingFace Space](https://img.shields.io/badge/🤗_Demo_Pública-HuggingFace-FFD21E?style=flat-square)](https://huggingface.co/spaces/EdsonPO/eii-incident-intelligence)
+[![HuggingFace Space](https://img.shields.io/badge/🤗_Demo_Pública-HuggingFace-FFD21E?style=flat-square)](https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence)
 [![GitHub](https://img.shields.io/badge/Source-GitHub-181717?style=flat-square&logo=github)](https://github.com/edson-aiops/eii-erp-incident-intelligence)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![MIT](https://img.shields.io/badge/License-MIT-22C55E?style=flat-square)](LICENSE)
 
-*EII — Transformando horas em segundos no diagnóstico de rejeições eSocial*  
+*EII — Transformando horas em segundos no diagnóstico de rejeições eSocial*
 *EII — Turning hours into seconds for eSocial rejection diagnostics*
 
 </div>

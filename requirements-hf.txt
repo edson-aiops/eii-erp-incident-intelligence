@@ -1,0 +1,8 @@
+# requirements-hf.txt
+# Dependências para a demo pública no Hugging Face Spaces
+# Usado apenas por app_hf.py
+
+gradio>=5.0.0
+requests>=2.31.0
+pydantic>=2.0.0
+huggingface_hub>=0.25.0

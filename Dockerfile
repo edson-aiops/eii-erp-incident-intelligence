@@ -40,4 +40,4 @@ ENV PYTHONUNBUFFERED=1 \
 EXPOSE 7860
 
 # Comando de inicialização
-CMD ["python", "app.py"]
+CMD ["python", "app_hf.py"]

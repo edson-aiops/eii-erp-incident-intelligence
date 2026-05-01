@@ -1,31 +1,52 @@
-{
-  "name": "EII — Incident Intelligence",
+﻿{
+  "name": "EII — ERP Incident Intelligence",
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
 
-  // Instala dependências logo após a criação do container
-  "postCreateCommand": "pip install -r requirements.txt && pip install fastmcp pytest",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "configureZshAsDefaultShell": true
+    }
+  },
 
-  // Variáveis de ambiente esperadas (valores configurados via Codespace Secrets)
+  "postCreateCommand": "pip install --upgrade pip && pip install -r requirements.txt && pip install fastmcp pytest black ruff",
+
+  "postStartCommand": "echo '\\n✅ EII Codespace pronto!' && python --version && pip list | head -20",
+
   "remoteEnv": {
     "GROQ_API_KEY": "${localEnv:GROQ_API_KEY}",
-    "DB_PATH": "${localEnv:DB_PATH}",
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}",
+    "OPENAI_API_KEY": "${localEnv:OPENAI_API_KEY}",
+    "QDRANT_URL": "${localEnv:QDRANT_URL}",
+    "QDRANT_API_KEY": "${localEnv:QDRANT_API_KEY}",
+    "EII_RETRIEVAL_BACKEND": "${localEnv:EII_RETRIEVAL_BACKEND}",
+    "LANGSMITH_API_KEY": "${localEnv:LANGSMITH_API_KEY}",
+    "LANGSMITH_PROJECT": "${localEnv:LANGSMITH_PROJECT}",
     "LANGFUSE_PUBLIC_KEY": "${localEnv:LANGFUSE_PUBLIC_KEY}",
     "LANGFUSE_SECRET_KEY": "${localEnv:LANGFUSE_SECRET_KEY}",
     "LANGFUSE_BASE_URL": "${localEnv:LANGFUSE_BASE_URL}",
-    "QDRANT_API_KEY": "${localEnv:QDRANT_API_KEY}",
-    "QDRANT_URL": "${localEnv:QDRANT_URL}",
-    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}",
-    "OPENAI_API_KEY": "${localEnv:OPENAI_API_KEY}",
-    "LANGSMITH_API_KEY": "${localEnv:LANGSMITH_API_KEY}",
-    "LANGSMITH_PROJECT": "${localEnv:LANGSMITH_PROJECT}"
+    "DB_PATH": "${localEnv:DB_PATH}",
+    "OLLAMA_BASE_URL": "${localEnv:OLLAMA_BASE_URL}",
+    "OLLAMA_MODEL": "${localEnv:OLLAMA_MODEL}"
   },
 
-  // Porta padrão do Gradio
-  "forwardPorts": [7860],
+  "forwardPorts": [7860, 8000, 11434],
   "portsAttributes": {
     "7860": {
       "label": "Gradio App",
       "onAutoForward": "openPreview"
+    },
+    "8000": {
+      "label": "FastAPI/MCP Server",
+      "onAutoForward": "notify"
+    },
+    "11434": {
+      "label": "Ollama (LGPD mode)",
+      "onAutoForward": "ignore"
     }
   },
 
@@ -34,16 +55,30 @@
       "extensions": [
         "ms-python.python",
         "ms-python.pylance",
+        "ms-python.black-formatter",
+        "charliermarsh.ruff",
         "ms-toolsai.jupyter",
-        "eamodio.gitlens"
+        "eamodio.gitlens",
+        "github.vscode-pull-request-github",
+        "redhat.vscode-yaml",
+        "ms-azuretools.vscode-docker"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
         "editor.formatOnSave": true,
+        "editor.rulers": [100],
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
         "[python]": {
-          "editor.defaultFormatter": "ms-python.python"
-        }
+          "editor.defaultFormatter": "ms-python.black-formatter",
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        },
+        "terminal.integrated.defaultProfile.linux": "bash"
       }
     }
-  }
+  },
+
+  "remoteUser": "vscode"
 }

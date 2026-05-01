@@ -19,7 +19,7 @@ WORKDIR /app
 
 # Copiar apenas o necessário do builder
 COPY --from=builder /root/.local /root/.local
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 
 # Adicionar local bin ao PATH
 ENV PATH=/root/.local/bin:$PATH

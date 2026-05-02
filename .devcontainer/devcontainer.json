@@ -3,10 +3,6 @@
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
 
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "version": "latest",
-      "moby": true
-    },
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/common-utils:2": {
       "configureZshAsDefaultShell": true
@@ -15,7 +11,7 @@
 
   "postCreateCommand": "pip install --upgrade pip && pip install -r requirements.txt && pip install fastmcp pytest black ruff",
 
-  "postStartCommand": "echo '\\n✅ EII Codespace pronto!' && python --version && pip list | head -20",
+  "postStartCommand": "echo 'EII Codespace pronto!' && python --version && pip list | head -20",
 
   "remoteEnv": {
     "GROQ_API_KEY": "${localEnv:GROQ_API_KEY}",
@@ -60,8 +56,7 @@
         "ms-toolsai.jupyter",
         "eamodio.gitlens",
         "github.vscode-pull-request-github",
-        "redhat.vscode-yaml",
-        "ms-azuretools.vscode-docker"
+        "redhat.vscode-yaml"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",

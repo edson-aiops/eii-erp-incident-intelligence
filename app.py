@@ -101,7 +101,7 @@ def ls_trace(name: str):
 SMARTROUTER_AVAILABLE = False
 try:
     # Importa apenas a função de diagnóstico do pipeline com SmartRouter
-    from crag_pipeline_smartrouter import diagnosticar_incidente as diagnosticar_incidente_sr
+    from crag_pipeline_smartrouter import run_crag as diagnosticar_incidente_sr
     SMARTROUTER_AVAILABLE = True
     print("✅ SmartRouter v2 loaded successfully")
 except ImportError as e:
@@ -120,8 +120,67 @@ warnings.filterwarnings("ignore", message=".*logfire-plugin.*")
 # Integração com Secure Secrets Manager (Credential Manager)
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _read_wincred(service: str, username: str) -> Optional[str]:
+    """Lê credencial do Windows Credential Manager via ctypes (compatível com cmdkey).
+
+    O Python keyring usa WinVaultKeyring que às vezes não lê credenciais salvas
+    via `cmdkey /add` porque o blob é UTF-16-LE e o lookup pode divergir.
+    Esta função chama CredReadW diretamente, contornando essa incompatibilidade.
+    """
+    if sys.platform != "win32":
+        return None
+    try:
+        import ctypes
+        import ctypes.wintypes as wt
+
+        CRED_TYPE_GENERIC = 1
+
+        class _FILETIME(ctypes.Structure):
+            _fields_ = [("dwLowDateTime", wt.DWORD), ("dwHighDateTime", wt.DWORD)]
+
+        class _CRED_ATTR(ctypes.Structure):
+            _fields_ = [
+                ("Keyword",   ctypes.c_wchar_p),
+                ("Flags",     wt.DWORD),
+                ("ValueSize", wt.DWORD),
+                ("Value",     ctypes.POINTER(wt.BYTE)),
+            ]
+
+        class _CREDENTIAL(ctypes.Structure):
+            _fields_ = [
+                ("Flags",              wt.DWORD),
+                ("Type",               wt.DWORD),
+                ("TargetName",         ctypes.c_wchar_p),
+                ("Comment",            ctypes.c_wchar_p),
+                ("LastWritten",        _FILETIME),
+                ("CredentialBlobSize", wt.DWORD),
+                ("CredentialBlob",     ctypes.POINTER(wt.BYTE)),
+                ("Persist",            wt.DWORD),
+                ("AttributeCount",     wt.DWORD),
+                ("Attributes",         ctypes.POINTER(_CRED_ATTR)),
+                ("TargetAlias",        ctypes.c_wchar_p),
+                ("UserName",           ctypes.c_wchar_p),
+            ]
+
+        advapi32 = ctypes.windll.advapi32
+        p_cred = ctypes.POINTER(_CREDENTIAL)()
+
+        if advapi32.CredReadW(service, CRED_TYPE_GENERIC, 0, ctypes.byref(p_cred)):
+            cred = p_cred.contents
+            blob_size = cred.CredentialBlobSize
+            if blob_size and cred.CredentialBlob and cred.UserName == username:
+                raw = bytes(cred.CredentialBlob[:blob_size])
+                advapi32.CredFree(p_cred)
+                return raw.decode("utf-16-le", errors="replace").rstrip("\x00")
+            advapi32.CredFree(p_cred)
+    except Exception:
+        pass
+    return None
+
+
 def get_config_with_fallback(key: str, default: str = None) -> Optional[str]:
-    """Recupera configuração: Credential Manager → .env → default"""
+    """Recupera configuração: Credential Manager (keyring) → Credential Manager (ctypes) → .env → default"""
+    # 1. Tenta via keyring (caminho normal)
     try:
         import keyring
         value = keyring.get_password("EII_Project", key)
@@ -129,7 +188,14 @@ def get_config_with_fallback(key: str, default: str = None) -> Optional[str]:
             return value
     except (ImportError, Exception):
         pass
-    
+
+    # 2. Fallback: lê direto do Windows Credential Manager via ctypes
+    #    Resolve incompatibilidade com credenciais salvas por `cmdkey /add`
+    value = _read_wincred("EII_Project", key)
+    if value:
+        return value
+
+    # 3. Fallback: arquivo .env local
     if ENV_FILE.exists():
         try:
             from dotenv import dotenv_values
@@ -139,7 +205,7 @@ def get_config_with_fallback(key: str, default: str = None) -> Optional[str]:
                 return value
         except Exception:
             pass
-    
+
     return default or os.getenv(key)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -497,7 +563,7 @@ with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Defaul
                 diagnose_btn = gr.Button("🚀 Diagnosticar", variant="primary", size="lg")
             
             with gr.Column(scale=2):
-                output = gr.Markdown(label="Resultado do Diagnóstico", show_copy_button=False)
+                output = gr.Markdown(label="Resultado do Diagnóstico")
                 error_output = gr.Textbox(label="⚠️ Mensagens de Erro", visible=False, interactive=False, elem_classes=["error-box"])
         
         gr.Markdown(f"\n*Versão: {datetime.now().strftime('%d/%m/%Y')} | LGPD: Integrado | Python 3.13 Ready | 🔒 Autenticado*")

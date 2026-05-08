@@ -232,16 +232,16 @@ def _inject_secrets_to_env():
     """Carrega API keys do Credential Manager para os.environ.
 
     Necessário porque crag_pipeline.py e smartrouter_v2 leem via os.environ.
-    Chamado uma vez na inicialização, após get_config_with_fallback estar disponível.
+    Sempre sobrescreve — keyring tem prioridade sobre valores de .env que
+    podem estar desatualizados ou como placeholder.
     """
     _KEYS = ["GROQ_API_KEY", "GOOGLE_AI_API_KEY", "MISTRAL_API_KEY",
              "CEREBRAS_API_KEY", "QWEN_API_KEY", "LANGCHAIN_API_KEY"]
     for k in _KEYS:
-        if not os.environ.get(k):
-            v = get_config_with_fallback(k)
-            if v:
-                os.environ[k] = v
-                print(f"[SECRETS] {k} injetado do Credential Manager")
+        v = get_config_with_fallback(k)  # keyring → ctypes → .env → os.getenv
+        if v:
+            os.environ[k] = v
+            print(f"[SECRETS] {k} configurado")
 
 _inject_secrets_to_env()
 

@@ -14,6 +14,14 @@ if sys.platform == "win32":
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", line_buffering=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Windows asyncio: usar SelectorEventLoop para evitar RuntimeError no cleanup
+# ProactorEventLoop (default Win32) fecha handles antes do httpx terminar
+# ─────────────────────────────────────────────────────────────────────────────
+import asyncio as _asyncio_policy
+if sys.platform == "win32":
+    _asyncio_policy.set_event_loop_policy(_asyncio_policy.WindowsSelectorEventLoopPolicy())
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Imports Padrão
 # ─────────────────────────────────────────────────────────────────────────────
 import gradio as gr

@@ -30,6 +30,7 @@
 | `batch_processor.py` | Funcionando | processamento paralelo |
 | `observability.py` | Parcial | LangSmith opcional |
 | `smartrouter_v2/` | Em desenvolvimento | nao integrado ainda |
+| `src/deep_agents/` | Funcionando | pipeline LangGraph 7 nos (Phase 4) |
 | `src/` | Em desenvolvimento | estrutura modular futura |
 
 ### Credenciais configuradas (Windows Credential Manager)
@@ -92,10 +93,16 @@
 
 ### Fase 4 — Deep Agents [EM PROGRESSO] `v2.3` (previsto)
 
-- [ ] SmartRouter v2 — refatoracao modular em `smartrouter_v2/`
+- [x] SmartRouter v2 — refatoracao modular em `smartrouter_v2/` (produzido pelo Qwen, revisado)
+- [x] Deep Agents pipeline — LangGraph StateGraph 7 nos implementados em `src/deep_agents/`
+  - parse_node: reutiliza xml_parser.parse_esocial_xml() + PII scrub
+  - router_node: roteia por severidade do evento eSocial (CRITICAL/HIGH->deep_reasoning, PII->sensitive_data)
+  - retrieve_node: ChromaDB + grade() de crag_pipeline.py
+  - generate_node: crag_pipeline.generate() com corrective_hint da reflexao
+  - evaluate_node: crag_pipeline.evaluate_diagnosis() com guarda MAX_ITERATIONS
+  - reflexion_node: crag_pipeline.reflect() -> corrective_hint para proxima iteracao
+  - finalize_node: ADR-001 logprobs confidence gate + final_result estruturado
 - [ ] IntelAgent — agente de inteligencia para sugestao proativa
-- [ ] ReflexionAgent — auto-avaliacao e reescrita do diagnostico
-- [ ] Deep Agents pipeline — orquestracao multi-agente com LangGraph
 - [ ] Integracao SAR2G real — conectar ao sistema interno ProSecurity
 - [ ] Tela de admin — gerenciamento de usuarios e permissoes em `app.py`
 - [ ] Upload de arquivo XML — alem de paste direto
@@ -214,6 +221,6 @@ for k in ['GROQ_API_KEY','EII_ADMIN_USER','EII_ADMIN_PASS','QDRANT_API_KEY']:
 
 ---
 
-**Ultima atualizacao:** 2026-05-08
+**Ultima atualizacao:** 2026-05-08 (Phase 4 nodes)
 **Autor:** Edson Oliveira
 **Mantido por:** obrigatorio — qualquer mudanca no projeto atualiza este arquivo

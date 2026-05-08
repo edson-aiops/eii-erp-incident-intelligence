@@ -7,11 +7,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Planned (Fase 4 — v2.3)
-- SmartRouter v2 — refatoracao modular em `smartrouter_v2/`
+### Added (Fase 4 — v2.3 em progresso)
+
+- **feat(deep-agents): LangGraph pipeline 7 nos — Phase 4** (branch `feature/claude-deep-agents-phase4`)
+  - `src/deep_agents/state.py` — `AgentState` TypedDict com todos os campos corretos;
+    adicionado campo `needs_refinement: bool` que estava ausente e quebrava `should_reflexion()`
+  - `src/deep_agents/nodes/parse_node.py` — reescrito para reutilizar `xml_parser.parse_esocial_xml()`
+    (PII scrub incluso); corrige bug `meta=` → `metadata=` do kwarg do dataclass `IncidentContext`
+  - `src/deep_agents/nodes/router_node.py` — substitui stub generico; roteia por severidade real do
+    evento eSocial: CRITICAL/HIGH → `deep_reasoning`, PII detectado → `sensitive_data`, demais → `validation`
+  - `src/deep_agents/nodes/retrieve_node.py` — implementa `build_vector_store()+retrieve()+grade()`
+    de `crag_pipeline.py`; query composta de evento+codigo_erro+ocorrencias
+  - `src/deep_agents/nodes/generate_node.py` — delega para `crag_pipeline.generate()` com
+    `corrective_hint` vindo da reflexao anterior; fallback estruturado se LLM falhar
+  - `src/deep_agents/nodes/evaluate_node.py` — delega para `crag_pipeline.evaluate_diagnosis()`;
+    guarda `MAX_ITERATIONS=2` evita loop infinito; `should_reflexion()` usa `state.needs_refinement`
+  - `src/deep_agents/nodes/reflexion_node.py` — delega para `crag_pipeline.reflect()`;
+    armazena reflection em `evaluation_feedback` como corrective_hint para proxima iteracao
+  - `src/deep_agents/nodes/finalize_node.py` — aplica ADR-001 logprobs confidence gate;
+    constroi `final_result` estruturado com metadata completo (kb_version, logprob_sim, routing)
+  - `src/deep_agents/nodes/__init__.py` — corrige imports para usar `reflexion_node.py` e
+    `finalize_node.py` separados (em vez do antigo stub `reflexion_finalize_nodes.py`)
+  - Graph compilado e smoke-tested E2E: pipeline flui parse→router→retrieve→generate→evaluate→finalize
+    com tratamento de erro gracioso em cada no
+
+### Planned (ainda pendente na Fase 4)
 - IntelAgent — agente de inteligencia proativa
-- ReflexionAgent — auto-avaliacao e reescrita do diagnostico
-- Deep Agents pipeline — orquestracao multi-agente com LangGraph
+- Integracao SAR2G real — conectar ao sistema interno ProSecurity
 - Tela de admin — gerenciamento de usuarios em `app.py`
 - Upload de arquivo XML (alem de paste direto)
 

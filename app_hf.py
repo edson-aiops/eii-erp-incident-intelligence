@@ -18,7 +18,7 @@ if str(project_root) not in sys.path:
 # Supressão de avisos de plugin Pydantic
 warnings.filterwarnings("ignore", message=".*logfire-plugin.*")
 
-from src.deep_agents_wrapper import diagnose_incident_deep_agents
+from src.deep_agents_wrapper import diagnose_incident_sync
 from src.utils.scrubber import scrub_pii
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ def diagnose_public(xml_raw: str, incident_id: str, mentor_mode: bool) -> tuple[
     
     # 3. Executar Deep Agents (via Groq Cloud no HF)
     try:
-        result = diagnose_incident_deep_agents(
+        result = diagnose_incident_sync(
             xml=xml_clean,
             incident_id=incident_id,
             mentor_mode=mentor_mode,

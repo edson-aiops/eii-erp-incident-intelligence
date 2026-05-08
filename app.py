@@ -163,16 +163,19 @@ def _read_wincred(service: str, username: str) -> Optional[str]:
             ]
 
         advapi32 = ctypes.windll.advapi32
-        p_cred = ctypes.POINTER(_CREDENTIAL)()
 
-        if advapi32.CredReadW(service, CRED_TYPE_GENERIC, 0, ctypes.byref(p_cred)):
-            cred = p_cred.contents
-            blob_size = cred.CredentialBlobSize
-            if blob_size and cred.CredentialBlob and cred.UserName == username:
-                raw = bytes(cred.CredentialBlob[:blob_size])
+        # Tenta GENERIC (1) — keyring/secure_secrets.py; depois DOMAIN_PASSWORD (2) — cmdkey
+        # Nota: cmdkey armazena como DOMAIN_PASSWORD mas o blob fica vazio por design do Windows
+        for cred_type in (1, 2):
+            p_cred = ctypes.POINTER(_CREDENTIAL)()
+            if advapi32.CredReadW(service, cred_type, 0, ctypes.byref(p_cred)):
+                cred = p_cred.contents
+                blob_size = cred.CredentialBlobSize
+                if blob_size and cred.CredentialBlob and cred.UserName == username:
+                    raw = bytes(cred.CredentialBlob[:blob_size])
+                    advapi32.CredFree(p_cred)
+                    return raw.decode("utf-16-le", errors="replace").rstrip("\x00")
                 advapi32.CredFree(p_cred)
-                return raw.decode("utf-16-le", errors="replace").rstrip("\x00")
-            advapi32.CredFree(p_cred)
     except Exception:
         pass
     return None

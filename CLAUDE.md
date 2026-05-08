@@ -1,156 +1,162 @@
-# CLAUDE.md
+# CLAUDE.md — Guia para Claude Code
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> Este arquivo orienta o Claude Code ao trabalhar neste repositorio.
+> Leia STATUS.md para o estado atual do projeto e WORKFLOW.md para o fluxo de trabalho.
 
-## Commands
+---
 
-**Run the app locally:**
-```bash
-python app/main.py
-```
-App runs at http://localhost:7860
+## Comandos Essenciais
 
-**Validate project structure (Phase 1 checks):**
-```bash
-python tests/validate_phase1.py
-```
-Run from the project root — the script auto-navigates there.
+```powershell
+# Rodar o app local
+cd C:\Projetos\eii-erp-incident-intelligence
+python app.py
+# Acesse http://127.0.0.1:7860 | Login: edson.oliveira + senha do Credential Manager
 
-**Build and run with Docker:**
-```bash
+# Rodar testes
+python -m pytest tests/ -v --tb=short
+
+# Verificar secrets
+python -c "import keyring; [print(k,':', 'OK' if keyring.get_password('EII_Project',k) else 'NAO') for k in ['GROQ_API_KEY','EII_ADMIN_USER','EII_ADMIN_PASS']]"
+
+# Instalar dependencias
+pip install -r requirements.txt
+
+# Build Docker
 docker build -t eii .
 docker run -p 7860:7860 --env-file .env eii
 ```
 
-**Install dependencies:**
-```bash
-pip install -r requirements.txt
+---
+
+## Arquitetura Atual (v2.2)
+
+O EII e um sistema de diagnostico de falhas de integracao eSocial com pipeline CRAG,
+autenticacao local, SmartRouter multi-LLM e Human-in-the-Loop.
+
+### Modo Dual
+
+```
+app.py        → versao LOCAL (interno, ProSecurity, dados reais, auth, SmartRouter completo)
+app_hf.py     → versao PUBLICA (HuggingFace, demo minima, sem auth, sem dados reais)
 ```
 
-## Architecture
+Nunca faca push de `app.py` como entry point do HuggingFace. O `Dockerfile` usa `app_hf.py`.
 
-EII is a **multi-HCM AIOps application** for resolving incidents in Workday, Senior HCM, and UKG systems. It is deployed to HuggingFace Spaces via Docker.
+### Pipeline Principal
 
-### Current State: Phase 1 (Foundation)
-The app (`app/main.py`) is a single-file Gradio application with stub logic. It shows the UI and routing structure but does not yet call any LLM or vector store — all analysis responses are placeholder text.
-
-### Target Architecture (Phases 2–5)
 ```
-Incident Log → HCM Router → LogAnalysisAgent → RootCauseDiagnosisAgent → CRAG Resolver → Response
-                  │
-                  └── Routes to one of 26 ChromaDB collections by system + module + language
+XML eSocial
+    |
+[xml_parser.py]         parse + PII scrub (CPF/CNPJ/NIS)
+    |
+[crag_pipeline.py]
+    Step 1: Retrieve    ChromaDB in-memory (sentence-transformers all-MiniLM)
+    Step 2: Grade       LLM 8b avalia relevancia (RELEVANTE/IRRELEVANTE)
+    Step 3: Generate    LLM 70b gera diagnostico JSON estruturado
+    |
+[EvaluatorAgent]        avalia qualidade, reescreve se necessario
+    |
+[SQLite]                persiste como PENDING
+    |
+[HITL — app.py]         analista aprova ou rejeita
+    |
+[Audit Log]             registro imutavel
 ```
 
-**Planned pipeline agents (LangGraph):**
-- `HCMRouter` — detects system (Workday/Senior/UKG), module, and language
-- `LogAnalysisAgent` — classifies error type
-- `RootCauseDiagnosisAgent` — identifies root cause
-- `CRAG Resolver` — Retrieve → Relevance Check → Generate/Correct with self-RAG fallback
+### SmartRouter (9 LLMs)
 
-**Observability:** Langfuse (one span per agent, RAGAS scores for faithfulness/relevancy)
+Roteamento automatico por tarefa e disponibilidade:
+- Groq (Llama 3.1 8b, Llama 3.3 70b)
+- Qwen
+- Cerebras
+- Moonshot
+- Mistral
+- Google AI
+- Ollama (local, ativado via checkbox LGPD)
 
-### Knowledge Base Structure
-26 ChromaDB collections under `data/kb/`, named `{system}_{module}_{lang}` (e.g., `workday_payroll_pt`, `senior_esocial_pt`, `ukg_pro_benefits_en`). The `data/` directory is mounted in Docker and kept empty via `.gitkeep` until Phase 2.
+### Autenticacao (app.py)
 
-### Environment Variables
-Required API keys (set in `.env` locally or via HuggingFace Spaces secrets):
-- `GROQ_API_KEY` — Groq API for Llama 3.1 70B (LLM + embeddings)
-- `LANGFUSE_SECRET_KEY` — Langfuse observability
-- `LANGFUSE_PUBLIC_KEY` — Langfuse observability
+Credenciais armazenadas no Windows Credential Manager via keyring:
+- `EII_ADMIN_USER` — usuario do dashboard
+- `EII_ADMIN_PASS` — senha (hash SHA-256 no runtime)
 
-### HuggingFace Spaces Deployment
-The README.md contains YAML front-matter required by HuggingFace Spaces (`sdk: docker`, `title`, `emoji`, `colorFrom`). The Dockerfile exposes port 7860, which is mandatory for HF Spaces. Any `git push` to the connected Space triggers an automatic redeploy.
+Funcao `get_config_with_fallback(key)` tenta em ordem:
+1. `keyring.get_password("EII_Project", key)`
+2. `_read_wincred("EII_Project", key)` via ctypes/CredReadW
+3. `.env` local
+4. `os.getenv(key)`
 
-### Phase Roadmap
-| Phase | Status | Deliverable |
-|-------|--------|-------------|
-| 1 — Foundation | ✅ Done | Gradio app + Docker + HF Spaces |
-| 2 — KB Multi-HCM | ⏳ Next | Simulated KB + ChromaDB + Groq LLM |
-| 3 — LangGraph | ⏳ | HCM Router + agents + CRAG |
-| 4 — Langfuse | ⏳ | Traces + spans per agent |
-| 5 — RAGAS | ⏳ | Faithfulness/relevancy evaluation per collection |
+**NUNCA use `cmdkey /add`** — armazena como DOMAIN_PASSWORD com blob inacessivel.
+**USE:** `python -c "import keyring; keyring.set_password('EII_Project', 'KEY', 'valor')"`
 
 ---
 
-## MCP Exposure (Phase 3)
+## Estrutura de Arquivos
 
-EII is exposed as an MCP server via **fastmcp**, enabling Claude and other MCP-compatible clients to call the CRAG diagnostic pipeline directly — without the Gradio UI.
-
-### New files
-
-| File | Role |
-|------|------|
-| `eii_handlers.py` | Pure Python handlers — no Gradio. Extracted `query_incident()` and `escalate_incident()` with their own DB layer (same SQLite file via `DB_PATH` env var). |
-| `mcp_server.py` | fastmcp server exposing `eii_query` and `eii_escalate` as MCP tools. |
-
-### Run the MCP server
-
-```bash
-# Requires: GROQ_API_KEY set in environment
-pip install fastmcp
-python mcp_server.py
+```
+app.py                  Dashboard local v2.2 (NUNCA vai para HF)
+app_hf.py               Demo publica HuggingFace
+crag_pipeline.py        Pipeline CRAG principal
+smartrouter/            Roteamento multi-LLM (v1, em uso)
+smartrouter_v2/         Refatoracao modular (em desenvolvimento)
+xml_parser.py           Parse eSocial + PII scrub
+knowledge_base.py       20 incidentes eSocial documentados
+eii_handlers.py         Handlers puros Python (para MCP)
+mcp_server.py           Servidor MCP via fastmcp
+secure_secrets.py       CLI para Windows Credential Manager
+batch_processor.py      Processamento paralelo de XMLs
+observability.py        Traces LangSmith (opcional)
+llm_resilient.py        Cliente LLM com retry/fallback
+tests/                  Suite de testes (pytest)
+docs/                   Documentacao tecnica
+src/                    Estrutura modular futura
+STATUS.md               Estado atual + roadmap (LEIA PRIMEIRO)
+CHANGELOG.md            Historico de mudancas (atualize em cada PR)
+WORKFLOW.md             Fluxo de trabalho git
+DUAL_MODE.md            Arquitetura dual local/HF
 ```
 
-The server starts in stdio mode (default for MCP clients). To use with Claude Desktop, add to `claude_desktop_config.json`:
+---
 
-```json
-{
-  "mcpServers": {
-    "eii": {
-      "command": "python",
-      "args": ["/path/to/eii-brasil/mcp_server.py"],
-      "env": { "GROQ_API_KEY": "your-key-here" }
-    }
-  }
-}
-```
+## Regras para o Claude
 
-### Tool contracts
+### Antes de qualquer tarefa
+1. Leia `STATUS.md` — entenda onde o projeto esta
+2. Leia `WORKFLOW.md` — siga o fluxo de branches
+3. Leia `DUAL_MODE.md` — confirme qual versao do app sera afetada
 
-**`eii_query(xml_rejeicao: str) → dict`**
+### Durante o desenvolvimento
+- Crie sempre branch `feature/claude-<descricao>` a partir da `main`
+- Use Conventional Commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`
+- Nao commite `.env`, `*.bak`, `__pycache__/`
 
-Analyzes an eSocial XML return through the CRAG pipeline. Persists result as `PENDING`.
+### Ao concluir
+- Atualize `STATUS.md` — marque o que foi feito, registre decisoes
+- Atualize `CHANGELOG.md` — descreva a mudanca com contexto tecnico
+- Crie PR com titulo descritivo e body com test plan
+- Merge na `main` somente apos testes passarem
 
-| Output field | Type | Description |
+### Segredos e credenciais
+- Nunca leia ou exiba valores completos de API keys no output
+- Nunca sugira usar `cmdkey /add` para credenciais do EII
+- Padrao: `keyring.set_password('EII_Project', 'KEY', 'valor')`
+
+---
+
+## Roadmap Resumido
+
+| Fase | Status | Versao |
 |---|---|---|
-| `incident_id` | str | Generated ID, e.g. `INC-20250307-143022` |
-| `evento` | str | eSocial event code, e.g. `S-1200` |
-| `codigo_erro` | str | Error codes from the XML response |
-| `severidade` | str | `CRÍTICO` \| `ALTO` \| `MÉDIO` \| `BAIXO` |
-| `confianca` | str | `ALTA` \| `MÉDIA` \| `BAIXA` (calibrated via logprobs) |
-| `fonte` | str | `KB_MATCH` \| `LLM_FALLBACK` |
-| `causa_raiz` | str | Technical root cause explanation |
-| `passos_resolucao` | list[str] | Ordered resolution steps |
-| `alerta_hitl` | str | Human review alert / escalation reason |
-| `_meta` | dict | Pipeline metadata (logprob_sim, eval_iterations, reflexion, etc.) |
+| 1 — Foundation | Concluida | v1.0 |
+| 2 — Intelligence & Compliance | Concluida | v2.0 |
+| 3 — Production (SmartRouter + MCP + Auth) | Concluida | v2.2 |
+| 4 — Deep Agents | Em progresso | v2.3 |
+| 5 — Observability & Scale | Planejado | v3.0 |
 
-**`eii_escalate(incident_id: str, status: str, notes: str = "") → dict`**
+Detalhes completos em `STATUS.md`.
 
-Records analyst decision for a `PENDING` incident (Human-in-the-Loop).
+---
 
-| Arg | Values |
-|---|---|
-| `status` | `"APROVADO"` or `"REJEITADO"` |
-| `notes` | Analyst rationale (recommended for audit trail) |
-
-Returns: `{ incident_id, status, decided_at, message }`
-
-### Test locally (no GROQ_API_KEY needed for unit tests)
-
-```bash
-# Run all 72 unit tests — zero network calls
-python -m pytest tests/test_phase2.py -v
-
-# Smoke-test the handler layer directly
-python -c "
-import os; os.environ['GROQ_API_KEY'] = 'your-key'
-from eii_handlers import query_incident
-print(query_incident('<your-xml-here>'))
-"
-```
-
-### Design constraints
-
-- `app.py`, `crag_pipeline.py`, and `tests/` are **not modified** by the MCP layer.
-- `eii_handlers.py` mirrors the DB schema and `DB_PATH` resolution from `app.py` exactly — both share the same SQLite file when run in the same environment.
-- The MCP server is stateless per request; the `_collection` (ChromaDB) is lazily initialized once per process.
+**Ultima atualizacao:** 2026-05-08
+**Autor:** Edson Oliveira + Claude

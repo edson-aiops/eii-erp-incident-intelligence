@@ -29,12 +29,12 @@ PROVIDERS: dict[str, ProviderConfig] = {
     # ── 7 FREE ───────────────────────────────────────────────────────────
     ProviderID.KIMI: ProviderConfig(
         id=ProviderID.KIMI,
-        name="Kimi K2.5 (Moonshot)",
+        name="Llama 3.3 70B (Groq — fallback geral)",
         base_url="https://api.groq.com/openai/v1",
-        model="moonshotai/kimi-k2-instruct",
+        model="llama-3.3-70b-versatile",
         api_key_env="GROQ_API_KEY",
-        temperature=0.6,                    # instant mode recommended
-        timeout_seconds=60.0,               # thinking mode can be slow
+        temperature=0.6,
+        timeout_seconds=30.0,
     ),
     ProviderID.QWEN: ProviderConfig(
         id=ProviderID.QWEN,
@@ -81,12 +81,12 @@ PROVIDERS: dict[str, ProviderConfig] = {
     ),
     ProviderID.DEEPSEEK: ProviderConfig(
         id=ProviderID.DEEPSEEK,
-        name="DeepSeek R1 (via Groq)",
+        name="QwQ 32B reasoning (via Groq)",
         base_url="https://api.groq.com/openai/v1",
-        model="deepseek-r1-distill-llama-70b",
+        model="qwen-qwq-32b",
         api_key_env="GROQ_API_KEY",
         temperature=0.6,
-        timeout_seconds=45.0,               # reasoning can take time
+        timeout_seconds=45.0,
     ),
 
     # ── 1 PAID ───────────────────────────────────────────────────────────

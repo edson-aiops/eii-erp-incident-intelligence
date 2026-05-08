@@ -33,7 +33,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Planned (ainda pendente na Fase 4)
 - IntelAgent — agente de inteligencia proativa
-- Integracao com sistema interno real — conectar ao ambiente corporativo
+- Integracao com sistema ERP/HCM real via API
 - Tela de admin — gerenciamento de usuarios em `app.py`
 - Upload de arquivo XML (alem de paste direto)
 

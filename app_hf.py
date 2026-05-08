@@ -1,105 +1,110 @@
-"""
-EII — ERP Incident Intelligence (HF Spaces Demo)
-Versão otimizada para Gradio 5 + Python 3.13
+﻿"""
+EII — ERP Incident Intelligence (PUBLIC DEMO v2.3)
+Versão para HuggingFace Spaces: Deep Agents v0.5 + PII Scrubbing + Groq Cloud
 """
 import os
 import gradio as gr
-import requests
 from datetime import datetime
+import warnings
+import sys
+from pathlib import Path
 
-# Configuração Groq (Tier Grátis: 30 req/min, ~1000 req/dia)
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-GROQ_MODEL = "llama-3.1-8b-instant"  # ✅ Modelo atualizado
+# Adicionar raiz do projeto ao sys.path para imports funcionarem
+project_root = Path(__file__).parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
-def call_groq(prompt: str) -> str:
-    if not GROQ_API_KEY:
-        return "⚠️ Configuração pendente: GROQ_API_KEY não encontrada nos Secrets do Space."
+
+# Supressão de avisos de plugin Pydantic
+warnings.filterwarnings("ignore", message=".*logfire-plugin.*")
+
+from src.deep_agents_wrapper import diagnose_incident_deep_agents
+from src.utils.scrubber import scrub_pii
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CONFIGURAÇÕES DA DEMO
+# ─────────────────────────────────────────────────────────────────────────────
+
+DEMO_WARNING = """
+⚠️ **DEMO PÚBLICA — NÃO USE DADOS REAIS**
+Esta é uma demonstração técnica para portfólio. Dados sensíveis (CPF/CNPJ/NIS) são **sanitizados automaticamente** antes do processamento.
+Para uso em produção com conformidade LGPD total, clone o repositório e rode a versão local com Ollama.
+🔗 [GitHub Repo](https://github.com/edson-aiops/eii-erp-incident-intelligence)
+"""
+
+def diagnose_public(xml_raw: str, incident_id: str, mentor_mode: bool) -> tuple[str, str]:
+    """Handler da Demo Pública com Scrubbing + Deep Agents"""
+    
+    # 1. Validação básica
+    if not xml_raw or not xml_raw.strip().startswith("<"):
+        return "### ❌ Erro\nXML inválido ou vazio. Cole um XML eSocial completo.", ""
+    
+    # 2. Scrubbing de PII (LGPD)
+    xml_clean, pii_counts = scrub_pii(xml_raw)
+    total_pii = sum(pii_counts.values())
+    
+    scrub_log = f" Scrubbing: {total_pii} dado(s) sensível(eis) removido(s)" if total_pii > 0 else "✅ Sem PII detectado"
+    
+    # 3. Executar Deep Agents (via Groq Cloud no HF)
     try:
-        response = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": GROQ_MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.1,
-                "max_tokens": 1500
-            },
-            timeout=30
+        result = diagnose_incident_deep_agents(
+            xml=xml_clean,
+            incident_id=incident_id,
+            mentor_mode=mentor_mode,
+            force_local=False,  # Força cloud na demo
+            retrieval_backend="chromadb"  # ChromaDB em memória para demo
         )
-        if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"]
-        return f"❌ Erro Groq ({response.status_code}): {response.text[:200]}"
+        
+        diagnosis = result.get("diagnostico", "### ❌ Erro ao gerar diagnóstico.")
+        metadata = result.get("metadata", "")
+        
+        # Adicionar log de scrubbing ao metadata
+        full_metadata = f"{scrub_log} | {metadata}"
+        return diagnosis, full_metadata
+        
     except Exception as e:
-        return f"❌ Erro de conexão: {str(e)}"
-
-def diagnose_eii(xml: str, incident_id: str, mentor_mode: bool) -> str:
-    if not xml.strip():
-        return "⚠️ Por favor, cole um XML válido."
-
-    prompt_base = f"""Você é o EII (ERP Incident Intelligence), especialista em eSocial e legislação trabalhista brasileira.
-Analise o seguinte XML de incidente e gere um diagnóstico técnico estruturado.
-
-XML:
-{xml[:3000]}
-
-Retorne APENAS em Markdown, com as seções:
-### 📋 Diagnóstico: {incident_id}
-**Rota:** ☁️ Cloud Demo (Groq/Llama 3) | **Status:** 🌐 Dados Públicos
-### 🔍 Causa Raiz
-[Explicação técnica]
-### 🛠️ Passos de Resolução
-1. ...
-2. ...
-### ✅ Validação
-[Como testar]
-"""
-
-    if mentor_mode:
-        prompt_base += "\n\n🎓 **MODO MENTOR ATIVADO:** Explique como se estivesse treinando um analista júnior. Inclua conceito técnico, por que o eSocial rejeita esse formato, e dica de prevenção."
-
-    result = call_groq(prompt_base)
-
-    footer = """
----
-> 💡 *Esta é uma **demo pública** para fins de portfolio. Dados sensíveis (CPF/CNPJ) NÃO devem ser usados aqui.*
-> 🔐 Para uso com **LGPD compliance** e processamento local, acesse o repositório completo:
-> 🔗 https://github.com/edson-aiops/eii-erp-incident-intelligence
-"""
-    return result + footer
+        import logging
+        logging.error(f"Erro na demo pública: {e}")
+        return f"### ❌ Erro Interno\n{str(e)}", scrub_log
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Interface Gradio (Compatível com Gradio 5 + HF Spaces)
+# INTERFACE GRADIO
 # ─────────────────────────────────────────────────────────────────────────────
 
-with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Default()) as demo:
-    gr.Markdown("""
-    # 🤖 EII — ERP Incident Intelligence
-    ### Diagnóstico Inteligente de Incidentes eSocial (Demo Pública)
-    """)
-
+with gr.Blocks(title="EII — Demo Pública", theme=gr.themes.Default()) as demo:
+    gr.Markdown("# 🤖 EII — ERP Incident Intelligence")
+    gr.Markdown("### Diagnóstico inteligente de incidentes eSocial com IA e roteamento LGPD")
+    gr.Markdown(DEMO_WARNING)
+    
     with gr.Row():
         with gr.Column(scale=1):
             xml_input = gr.Textbox(
-                label="XML do eSocial", 
-                lines=10, 
-                placeholder="Cole o XML aqui...", 
-                value="<evtFech4000>\n  <ideEvento>\n    <tpAmb>1</tpAmb>\n  </ideEvento>\n</evtFech4000>"
+                label="XML do eSocial",
+                lines=10,
+                placeholder="Cole o XML rejeitado aqui...",
+                show_copy_button=True
             )
             incident_id = gr.Textbox(
-                label="ID do Incidente", 
-                value=f"INC-{datetime.now().strftime('%Y%m%d-%H%M')}", 
-                interactive=True
+                label="ID do Incidente",
+                value=f"INC-{datetime.now().strftime('%Y%m%d-%H%M')}"
             )
             mentor_mode = gr.Checkbox(label="🎓 Modo Mentor + Checklist HITL", value=False)
-            btn = gr.Button("🚀 Diagnosticar", variant="primary")
-
+            diagnose_btn = gr.Button("🚀 Diagnosticar", variant="primary")
+            
         with gr.Column(scale=2):
             output = gr.Markdown(label="Resultado do Diagnóstico")
-
-    gr.Markdown("---\n*Versão: v2.2 | LGPD: Integrado (Local) | 🔗 [GitHub Repo](https://github.com/edson-aiops/eii-erp-incident-intelligence)*")
-
-    btn.click(fn=diagnose_eii, inputs=[xml_input, incident_id, mentor_mode], outputs=[output])
+            metadata_box = gr.Textbox(label="📊 Metadados & Logs", interactive=False, lines=2)
+    
+    gr.Markdown("---\n*Versão: 2.3 | Deep Agents v0.5 | LGPD: Scrubbing Ativo | 🔗 [GitHub](https://github.com/edson-aiops/eii-erp-incident-intelligence)*")
+    
+    diagnose_btn.click(
+        fn=diagnose_public,
+        inputs=[xml_input, incident_id, mentor_mode],
+        outputs=[output, metadata_box]
+    )
 
 if __name__ == "__main__":
-    # Gradio 5 detecta automaticamente o ambiente HF Spaces
+    print("🚀 Iniciando EII Demo Pública v2.3...")
+    print("📊 Acesse: http://127.0.0.1:7860")
+    print("🧼 PII Scrubbing: ATIVO | LLM: Groq Cloud")
     demo.launch(server_name="0.0.0.0", server_port=7860)

@@ -792,9 +792,9 @@ OPENAI_API_KEY=sk-...                 # Optional (fallback)
 
 *Senior IT Systems Analyst — HCM/ERP & AI Engineering*
 
-12+ anos de experiência em implementação de sistemas HCM/ERP corporativos com especialização emergente em AI/Agentic Engineering. O EII é o projeto principal do meu portfólio técnico, demonstrando a convergência entre expertise em compliance brasileiro (eSocial, LGPD, CLT) e engenharia de sistemas agentic modernos.
+12+ anos de experiência em implementação de sistemas HCM/ERP com especialização emergente em AI/Agentic Engineering. O EII é o projeto principal do meu portfólio técnico, demonstrando a convergência entre expertise em compliance brasileiro (eSocial, LGPD, CLT) e engenharia de sistemas agentic modernos.
 
-*12+ years of HCM/ERP implementation experience (HCM, HCM, ERP, HCM) with emerging specialization in AI/Agentic Engineering. EII is the flagship project of my technical portfolio, demonstrating the convergence of Brazilian compliance expertise (eSocial, LGPD, CLT) with modern agentic systems engineering.*
+*12+ years of HCM/ERP implementation experience with emerging specialization in AI/Agentic Engineering. EII is the flagship project of my technical portfolio, demonstrating the convergence of Brazilian compliance expertise (eSocial, LGPD, CLT) with modern agentic systems engineering.*
 
 [![GitHub](https://img.shields.io/badge/GitHub-edson--aiops-181717?style=for-the-badge&logo=github)](https://github.com/edson-aiops)
 [![HuggingFace](https://img.shields.io/badge/HuggingFace-EdsonPO-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)](https://huggingface.co/EdsonPO)

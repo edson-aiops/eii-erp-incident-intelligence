@@ -25,7 +25,7 @@ um evento é rejeitado.
 - Analistas gastam 30–90 minutos por incidente pesquisando documentação, fóruns e histórico
 - Erros de diagnóstico levam a retransmissões incorretas, multas por atraso e inconsistências
   no CNIS do trabalhador
-- Sistemas HCM corporativos não fornecem diagnóstico — apenas repassam
+- Sistemas HCM/ERP de mercado não fornecem diagnóstico — apenas repassam
   o XML de erro para o analista
 
 ### Solução
@@ -43,7 +43,7 @@ Um analista humano aprova ou rejeita o diagnóstico antes de qualquer ação ser
 | Campo | Detalhe |
 |---|---|
 | **Nome** | Camila, Analista de Departamento Pessoal |
-| **Experiência** | 5 anos em folha de pagamento, usuária do sistema HCM |
+| **Experiência** | 5 anos em folha de pagamento, usuária de sistema HCM/ERP |
 | **Dor principal** | Recebe XMLs de erro do eSocial e precisa de 30–60 min para diagnosticar cada um |
 | **Expectativa** | Diagnóstico claro em português, com passos numerados, em menos de 30 segundos |
 | **Restrição** | Não tem perfil técnico de TI; não lê XML bruto; precisa de linguagem DP, não dev |
@@ -231,7 +231,7 @@ os principais cenários de erro (retificação, certificado, vínculo, timeout).
 |---|---|---|
 | **1 — Foundation** | ✅ Completa | Gradio UI · Docker · HuggingFace Spaces deploy · XML Parser · CRAG stub · 5 exemplos |
 | **2 — Intelligence & Compliance** | ✅ Completa | PII scrubbing LGPD · SQLite persistence · Model routing · Logprobs ADR-001 · 46 testes |
-| **3 — LangGraph Agents** | 🔲 Planejada | HCMRouter (HCM/Senior/HCM) · LogAnalysisAgent · RootCauseDiagnosisAgent · LangGraph state machine |
+| **3 — LangGraph Agents** | 🔲 Planejada | HCMRouter (multi-ERP) · LogAnalysisAgent · RootCauseDiagnosisAgent · LangGraph state machine |
 | **4 — Observabilidade** | 🔲 Planejada | Langfuse integração · Spans por agente · RAGAS faithfulness/relevancy por coleção |
 | **5 — KB Expansion** | 🔲 Planejada | 100+ incidentes · Suporte EFD-Reinf · Upload de arquivo XML · Multi-versão leiaute |
 | **6 — Integrações** | 🔲 Planejada | API REST · Webhook JIRA/ServiceNow · Notificação e-mail HITL · Dashboard métricas |

@@ -17,7 +17,7 @@ O EII vive em **um único repositório** mas serve **dois públicos diferentes**
 │   │      app.py           │         │      app_hf.py         │ │
 │   │   (LOCAL — INTERNO)   │         │  (HUGGINGFACE — VITRINE)│ │
 │   │                       │         │                        │ │
-│   │  Edson + equipe interna  │         │  Recrutadores + público │ │
+│   │  Uso interno          │         │  Recrutadores + público │ │
 │   │  Dados sensíveis OK   │         │  Sem dados reais       │ │
 │   │  Ollama habilitado    │         │  Apenas Groq cloud     │ │
 │   └───────────────────────┘         └────────────────────────┘ │
@@ -62,7 +62,7 @@ O EII vive em **um único repositório** mas serve **dois públicos diferentes**
 
 ### Versão LOCAL (`app.py`)
 
-**Quando usar:** desenvolvimento, demonstração interna, testes com dados reais, validação do caminho LGPD.
+**Quando usar:** desenvolvimento, testes com dados reais, validação do caminho LGPD.
 
 ```powershell
 cd C:\Projetos\eii-erp-incident-intelligence
@@ -141,7 +141,7 @@ Se você editar:
 
 ### REGRA 3 — Mudanças em `app.py` ficam no local
 
-Adicionar uma feature interna (ex: novo painel admin, integração com sistema interno real) só vai em `app.py`. Não tente "portar" para `app_hf.py` se não fizer sentido publicamente.
+Adicionar uma feature interna (ex: novo painel admin, integração com sistema ERP via API) só vai em `app.py`. Não tente "portar" para `app_hf.py` se não fizer sentido publicamente.
 
 ### REGRA 4 — Mudanças em `app_hf.py` ficam no público
 

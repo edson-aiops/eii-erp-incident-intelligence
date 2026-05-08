@@ -103,7 +103,7 @@
   - reflexion_node: crag_pipeline.reflect() -> corrective_hint para proxima iteracao
   - finalize_node: ADR-001 logprobs confidence gate + final_result estruturado
 - [ ] IntelAgent — agente de inteligencia para sugestao proativa
-- [ ] Integracao com sistema interno real — conectar ao ambiente corporativo
+- [ ] Integracao com sistema ERP/HCM real via API
 - [ ] Tela de admin — gerenciamento de usuarios e permissoes em `app.py`
 - [ ] Upload de arquivo XML — alem de paste direto
 

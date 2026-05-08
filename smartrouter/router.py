@@ -260,29 +260,43 @@ class RoutingEngine:
     ) -> tuple[ProviderID, bool]:
         """Select provider. Returns (provider_id, is_fallback).
 
-        If primary circuit is open, returns fallback.
-        If both are open, returns GROQ as emergency fallback.
+        Skips providers whose API key is not configured in os.environ.
+        If primary is unavailable or has no key, tries fallback.
+        If both are unavailable, uses Groq as emergency fallback.
         """
         rule = self._rules.get(classification.task_type)
         if not rule:
             rule = self._rules[TaskType.GENERAL]
 
+        def _is_usable(pid: ProviderID) -> bool:
+            if not circuit_breaker.is_available(pid):
+                return False
+            cfg = PROVIDERS.get(pid)
+            # Ollama is local — no key needed
+            if cfg and pid != ProviderID.OLLAMA:
+                if not os.environ.get(cfg.api_key_env):
+                    logger.debug(
+                        "Skipping %s: %s not configured", pid.value, cfg.api_key_env
+                    )
+                    return False
+            return True
+
         # Try primary
-        if circuit_breaker.is_available(rule.primary):
+        if _is_usable(rule.primary):
             return rule.primary, False
 
         # Try fallback
         logger.info(
-            f"Primary {rule.primary.value} unavailable, "
-            f"falling back to {rule.fallback.value}"
+            "Primary %s unavailable, falling back to %s",
+            rule.primary.value, rule.fallback.value,
         )
-        if circuit_breaker.is_available(rule.fallback):
+        if _is_usable(rule.fallback):
             return rule.fallback, True
 
         # Emergency: Groq as universal fallback
         logger.warning(
-            f"Both {rule.primary.value} and {rule.fallback.value} unavailable. "
-            "Emergency fallback to Groq."
+            "Both %s and %s unavailable. Emergency fallback to Groq.",
+            rule.primary.value, rule.fallback.value,
         )
         return ProviderID.GROQ, True
 

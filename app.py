@@ -14,6 +14,14 @@ if sys.platform == "win32":
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", line_buffering=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Windows asyncio: usar SelectorEventLoop para evitar RuntimeError no cleanup
+# ProactorEventLoop (default Win32) fecha handles antes do httpx terminar
+# ─────────────────────────────────────────────────────────────────────────────
+import asyncio as _asyncio_policy
+if sys.platform == "win32":
+    _asyncio_policy.set_event_loop_policy(_asyncio_policy.WindowsSelectorEventLoopPolicy())
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Imports Padrão
 # ─────────────────────────────────────────────────────────────────────────────
 import gradio as gr
@@ -108,6 +116,22 @@ except ImportError as e:
     print(f"⚠️ SmartRouter not available: {e}. Using standard pipeline.")
     # Fallback: usa o pipeline padrão que já funciona
     from crag_pipeline import diagnosticar_incidente as diagnosticar_incidente_sr
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DEEP AGENTS INTEGRATION (LangGraph pipeline — Fase 4)
+# ─────────────────────────────────────────────────────────────────────────────
+
+DEEP_AGENTS_AVAILABLE = False
+try:
+    import asyncio as _asyncio
+    import concurrent.futures as _futures
+    from src.deep_agents.graph import create_deep_agent_graph as _create_graph
+    from src.deep_agents.state import AgentState as _AgentState
+    _eii_agent_graph = _create_graph()
+    DEEP_AGENTS_AVAILABLE = True
+    print("✅ Deep Agents pipeline (LangGraph) loaded successfully")
+except Exception as _e:
+    print(f"⚠️ Deep Agents not available: {_e}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Configurações Globais
@@ -210,6 +234,34 @@ def get_config_with_fallback(key: str, default: str = None) -> Optional[str]:
             pass
 
     return default or os.getenv(key)
+
+
+_PLACEHOLDER_VALUES = {
+    "", "placeholder", "chave_key", "mude_esta_senha_urgente_123",
+    "no-key-needed", "your-key-here", "sk-xxx",
+}
+
+def _inject_secrets_to_env():
+    """Carrega API keys do Credential Manager para os.environ.
+
+    Sempre sobrescreve — keyring tem prioridade sobre .env.
+    Remove placeholders do os.environ para que SmartRouter pule
+    providers não configurados (load_dotenv pode ter setado "placeholder").
+    """
+    _KEYS = ["GROQ_API_KEY", "GOOGLE_AI_API_KEY", "MISTRAL_API_KEY",
+             "CEREBRAS_API_KEY", "QWEN_API_KEY", "LANGCHAIN_API_KEY"]
+    for k in _KEYS:
+        v = get_config_with_fallback(k)  # keyring → ctypes → .env → os.getenv
+        if v and v not in _PLACEHOLDER_VALUES:
+            os.environ[k] = v
+            print(f"[SECRETS] {k} configurado")
+        else:
+            # Remove placeholder para SmartRouter nao tentar o provider
+            if os.environ.get(k, "") in _PLACEHOLDER_VALUES:
+                os.environ.pop(k, None)
+                print(f"[SECRETS] {k} removido (placeholder)")
+
+_inject_secrets_to_env()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURAÇÃO DE SEGURANÇA
@@ -360,43 +412,146 @@ def format_output(result: dict, route_used: str) -> str:
     return md
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Formatador Deep Agents
+# ─────────────────────────────────────────────────────────────────────────────
+
+def format_output_deep_agents(final_result: dict, errors: list, warnings: list) -> str:
+    if not final_result:
+        errs = "\n".join(errors) if errors else "Nenhum detalhe disponível."
+        return f"❌ **Diagnóstico não gerado.**\n\n{errs}"
+
+    meta = final_result.get("metadata", {})
+    logprob = meta.get("logprob_sim")
+    logprob_str = f"{logprob:.3f}" if logprob is not None else "N/A"
+    routing = meta.get("routing_decision", "N/A")
+    iteracoes = meta.get("iteracoes", 0)
+    eval_score = meta.get("evaluation_score")
+    eval_str = f"{eval_score:.0%}" if eval_score is not None else "N/A"
+
+    passos_md = ""
+    for i, step in enumerate(final_result.get("passos_resolucao", []), 1):
+        passos_md += f"{i}. {step}\n"
+
+    alerta = final_result.get("alerta_hitl", "")
+    alerta_md = f"\n> ⚠️ **HITL:** {alerta}" if alerta else ""
+
+    refs = final_result.get("referencias_kb", [])
+    refs_md = f"\n**Referências KB:** {', '.join(refs)}" if refs else ""
+
+    warn_md = ""
+    if warnings:
+        warn_md = "\n**Avisos:** " + " | ".join(warnings)
+
+    err_md = ""
+    if errors:
+        err_md = "\n\n> ⚠️ " + "\n> ".join(errors)
+
+    return f"""### 📋 Diagnóstico Deep Agents: `{final_result.get('incident_id', 'N/A')}`
+**Pipeline:** LangGraph v2.3 | **Routing:** `{routing}` | **Iterações:** {iteracoes}
+
+| Campo | Valor |
+|-------|-------|
+| **Severidade** | {final_result.get('severidade', 'N/A')} |
+| **Confiança** | {final_result.get('confianca', 'N/A')} (logprob={logprob_str}) |
+| **Fonte** | {final_result.get('fonte', 'N/A')} |
+| **Avaliação** | {eval_str} |
+| **Tempo estimado** | {final_result.get('tempo_estimado', 'N/A')} |
+
+### 🔍 Causa Raiz
+{final_result.get('diagnostico', 'N/A')}
+
+### 🛠️ Passos de Resolução
+{passos_md}
+### ✅ Validação
+{final_result.get('validacao', 'N/A')}
+{alerta_md}{refs_md}{warn_md}{err_md}"""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Executor Deep Agents (sync wrapper para asyncio)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _diagnose_deep_agents(xml: str, inc_id: str, mentor: bool) -> str:
+    init_state: _AgentState = {
+        "xml_input": xml,
+        "incident_id": inc_id,
+        "use_mentor_mode": mentor,
+        "context": None,
+        "retrieved": None,
+        "diagnosis": None,
+        "evaluation_score": None,
+        "evaluation_feedback": None,
+        "needs_refinement": False,
+        "iteration_count": 0,
+        "max_iterations": 2,
+        "routing_decision": None,
+        "retrieval_backend": os.environ.get("EII_RETRIEVAL_BACKEND", "chromadb"),
+        "model_used": None,
+        "errors": [],
+        "warnings": [],
+        "final_result": None,
+    }
+
+    # Executa o grafo async de forma segura — Gradio pode rodar em loop existente
+    try:
+        loop = _asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        with _futures.ThreadPoolExecutor(max_workers=1) as pool:
+            result_state = pool.submit(_asyncio.run, _eii_agent_graph.ainvoke(init_state)).result()
+    else:
+        result_state = _asyncio.run(_eii_agent_graph.ainvoke(init_state))
+
+    final_result = result_state.get("final_result")
+    errors = result_state.get("errors", [])
+    warnings = result_state.get("warnings", [])
+
+    formatted = format_output_deep_agents(final_result, errors, warnings)
+    return formatted
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Handler Principal SEGURO
 # ─────────────────────────────────────────────────────────────────────────────
 
 @ls_trace("eii.diagnose_handler_secure")
 def diagnose_handler_secure(
-    xml: str, 
-    inc_id: str, 
-    err_code: str, 
-    mentor: bool, 
+    xml: str,
+    inc_id: str,
+    err_code: str,
+    mentor: bool,
     force_local: bool,
     session_token: str,
-    use_smartrouter: bool = False
+    use_smartrouter: bool = False,
+    use_deep_agents: bool = False,
 ) -> tuple[str, str]:
     if not session_token or not is_session_valid(session_token):
         log_secure("unknown", "diagnose_attempt_failed", reason="invalid_session")
         return "", "❌ Sessão expirada ou inválida. Faça login novamente."
-    
+
     user_info = user_sessions[session_token]
     user_id = user_info.get("username", "unknown")
-    
+
     allowed, remaining = rate_limit_check(user_id)
     if not allowed:
         log_secure(user_id, "rate_limit_exceeded", incident_id=inc_id)
         return "", f"⚠️ Rate limit excedido. Aguarde {RATE_LIMIT_WINDOW} segundos."
-    
+
     if not xml.strip():
         log_secure(user_id, "diagnose_attempt_failed", incident_id=inc_id, reason="empty_xml")
         return "", "⚠️ Por favor, cole o conteúdo do XML antes de diagnosticar."
-    
+
     log_secure(user_id, "diagnose_started", incident_id=inc_id, extra={
-        "force_local": force_local, 
+        "force_local": force_local,
         "mentor_mode": mentor,
-        "use_smartrouter": use_smartrouter
+        "use_smartrouter": use_smartrouter,
+        "use_deep_agents": use_deep_agents,
     })
-    
+
     try:
-        resultado = _diagnose_internal(xml, inc_id, err_code, mentor, force_local, use_smartrouter)
+        resultado = _diagnose_internal(xml, inc_id, err_code, mentor, force_local, use_smartrouter, use_deep_agents)
         log_secure(user_id, "diagnose_completed", incident_id=inc_id, extra={"remaining_requests": remaining})
         return resultado, ""
     except Exception as e:
@@ -404,7 +559,7 @@ def diagnose_handler_secure(
         return "", f"💥 Erro interno: {type(e).__name__}"
 
 @ls_trace("eii.diagnose_internal")
-def _diagnose_internal(xml: str, inc_id: str, err_code: str, mentor: bool, force_local: bool, use_smartrouter: bool = False) -> str:
+def _diagnose_internal(xml: str, inc_id: str, err_code: str, mentor: bool, force_local: bool, use_smartrouter: bool = False, use_deep_agents: bool = False) -> str:
     # 1. Forçar Local (Ollama) - prioridade máxima para LGPD
     if force_local:
         print(f"🏭 [DEBUG] Forçando uso do Ollama local para {inc_id}...")
@@ -435,7 +590,17 @@ def _diagnose_internal(xml: str, inc_id: str, err_code: str, mentor: bool, force
         except Exception as e:
             return f"💥 Erro ao chamar Ollama: {str(e)}"
     
-    # 2. Pipeline principal (SmartRouter ou padrão)
+    # 2. Deep Agents pipeline (LangGraph — Fase 4)
+    if use_deep_agents and DEEP_AGENTS_AVAILABLE:
+        print(f"🤖 [DEBUG] Usando Deep Agents pipeline para {inc_id}...")
+        try:
+            result = _diagnose_deep_agents(xml, inc_id, mentor)
+            print(f"✅ [DEBUG] Deep Agents concluído para {inc_id}")
+            return result
+        except Exception as e:
+            print(f"💥 [DEBUG] Deep Agents falhou: {e} — caindo para pipeline padrão")
+
+    # 3. Pipeline principal (SmartRouter ou padrão)
     pipeline_name = "SmartRouter" if (use_smartrouter and SMARTROUTER_AVAILABLE) else "padrão"
     print(f"☁️ [DEBUG] Usando pipeline {pipeline_name} para {inc_id}...")
     
@@ -553,15 +718,22 @@ with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Defaul
                 with gr.Row():
                     mentor_mode = gr.Checkbox(label="🎓 Modo Mentor + Checklist HITL", value=False)
                     force_local = gr.Checkbox(label="🏭 Forçar Local (Ollama)", value=False)
-                    # Checkbox SmartRouter só aparece se disponível
                     if SMARTROUTER_AVAILABLE:
                         use_smartrouter = gr.Checkbox(
-                            label="🧠 Usar SmartRouter (Avançado)", 
+                            label="🧠 SmartRouter (multi-LLM)",
                             value=False,
                             info="Roteamento inteligente multi-LLM com fallback resiliente"
                         )
                     else:
                         use_smartrouter = gr.State(False)
+                    if DEEP_AGENTS_AVAILABLE:
+                        use_deep_agents = gr.Checkbox(
+                            label="🤖 Deep Agents (LangGraph v2.3)",
+                            value=False,
+                            info="Pipeline multi-agente: parse → route → retrieve → generate → evaluate → reflexion"
+                        )
+                    else:
+                        use_deep_agents = gr.State(False)
                 
                 diagnose_btn = gr.Button("🚀 Diagnosticar", variant="primary", size="lg")
             
@@ -576,7 +748,7 @@ with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Defaul
     logout_btn.click(fn=logout, inputs=[session_token], outputs=[login_container, main_interface]).then(fn=lambda: ("", ""), outputs=[session_token, current_user])
     diagnose_btn.click(
         fn=diagnose_handler_secure,
-        inputs=[xml_input, incident_id, error_code, mentor_mode, force_local, session_token, use_smartrouter],
+        inputs=[xml_input, incident_id, error_code, mentor_mode, force_local, session_token, use_smartrouter, use_deep_agents],
         outputs=[output, error_output]
     ).then(fn=lambda err: gr.update(visible=bool(err and err.strip())), inputs=[error_output], outputs=[error_output])
     demo.load(fn=get_user_display, inputs=[current_user], outputs=[user_info])
@@ -587,7 +759,7 @@ with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Defaul
 
 if __name__ == "__main__":
     os.environ["GRADIO_ANALYTICS_ENABLED"] = "false"
-    print("🚀 Iniciando EII Dashboard v2.2 (Mentor + SmartRouter + Observability)...")
+    print("🚀 Iniciando EII Dashboard v2.3 (Mentor + SmartRouter + Deep Agents + Observability)...")
     print(f"📊 Acesse: http://127.0.0.1:7860")
     print(f"🔐 Login: usa Credential Manager ou .env")
     print(f"🛡️ Segurança: Rate limit={RATE_LIMIT_REQUESTS}req/{RATE_LIMIT_WINDOW}s | Session timeout={SESSION_TIMEOUT_MINUTES}min")
@@ -595,4 +767,8 @@ if __name__ == "__main__":
         print("🧠 SmartRouter: Disponível (marque o checkbox para usar)")
     else:
         print("⚠️ SmartRouter: Não disponível (usando pipeline padrão)")
+    if DEEP_AGENTS_AVAILABLE:
+        print("🤖 Deep Agents (LangGraph): Disponível (marque o checkbox para usar)")
+    else:
+        print("⚠️ Deep Agents: Não disponível")
     demo.launch(server_name="127.0.0.1", server_port=7860, quiet=True)

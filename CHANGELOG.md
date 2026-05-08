@@ -7,13 +7,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Planned
-- Expansão da KB para 100+ incidentes documentados
+### Planned (Fase 4 — v2.3)
+- SmartRouter v2 — refatoracao modular em `smartrouter_v2/`
+- IntelAgent — agente de inteligencia proativa
+- ReflexionAgent — auto-avaliacao e reescrita do diagnostico
+- Deep Agents pipeline — orquestracao multi-agente com LangGraph
+- Tela de admin — gerenciamento de usuarios em `app.py`
+- Upload de arquivo XML (alem de paste direto)
+
+### Planned (Fase 5 — v3.0)
+- Expansao da KB para 100+ incidentes documentados
 - Suporte a EFD-Reinf (R-xxxx series)
-- Upload de arquivo XML (além de paste)
-- Dashboard de métricas (MTTR, taxa de resolução automática, escalation rate)
-- API REST para integração com ticketing (JIRA, ServiceNow)
-- Notificação por e-mail quando incidente aguarda aprovação HITL
+- Dashboard de metricas (MTTR, taxa de resolucao automatica, escalation rate)
+- API REST para integracao com ticketing (JIRA, ServiceNow)
+- Notificacao por e-mail quando incidente aguarda aprovacao HITL
+- Multitenancy para SaaS
+
+---
+
+## [2.2.1] — 2026-05-08
+
+### Fixed
+- **fix(auth): fallback ctypes para Windows Credential Manager** (PR #2)
+  - `keyring.get_password("EII_Project", key)` retornava `None` em cenarios onde
+    o backend `WinVaultKeyring` divergia do formato do Vault — especialmente apos
+    tentativas de uso de `cmdkey /add`
+  - Adicionado `_read_wincred(service, username)` em `app.py` que chama
+    `advapi32.CredReadW` diretamente via `ctypes`, contornando a abstracao do keyring
+  - Tenta `CRED_TYPE_GENERIC` (1) e `CRED_TYPE_DOMAIN_PASSWORD` (2) em sequencia;
+    retorna o blob UTF-16-LE decodificado quando `CredentialBlobSize > 0`
+  - Cadeia de fallback atualizada: keyring → ctypes → .env → os.getenv()
+  - Sem novas dependencias (ctypes e stdlib); no-op em plataformas nao-Windows
+  - Descoberta colateral: `cmdkey` armazena como `CRED_TYPE_DOMAIN_PASSWORD` com
+    blob vazio por design do Windows — inacessivel a aplicacoes. Uso descartado.
+    Padrao adotado: `python secure_secrets.py set KEY VALUE` (CRED_TYPE_GENERIC)
+
+### Changed
+- `DUAL_MODE.md` — atualizado com padrao de armazenamento de credenciais via keyring
+- `STATUS.md` — criado como fonte da verdade do estado atual e roadmap do projeto
 
 ---
 

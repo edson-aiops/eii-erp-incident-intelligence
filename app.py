@@ -228,20 +228,30 @@ def get_config_with_fallback(key: str, default: str = None) -> Optional[str]:
     return default or os.getenv(key)
 
 
+_PLACEHOLDER_VALUES = {
+    "", "placeholder", "chave_key", "mude_esta_senha_urgente_123",
+    "no-key-needed", "your-key-here", "sk-xxx",
+}
+
 def _inject_secrets_to_env():
     """Carrega API keys do Credential Manager para os.environ.
 
-    Necessário porque crag_pipeline.py e smartrouter_v2 leem via os.environ.
-    Sempre sobrescreve — keyring tem prioridade sobre valores de .env que
-    podem estar desatualizados ou como placeholder.
+    Sempre sobrescreve — keyring tem prioridade sobre .env.
+    Remove placeholders do os.environ para que SmartRouter pule
+    providers não configurados (load_dotenv pode ter setado "placeholder").
     """
     _KEYS = ["GROQ_API_KEY", "GOOGLE_AI_API_KEY", "MISTRAL_API_KEY",
              "CEREBRAS_API_KEY", "QWEN_API_KEY", "LANGCHAIN_API_KEY"]
     for k in _KEYS:
         v = get_config_with_fallback(k)  # keyring → ctypes → .env → os.getenv
-        if v:
+        if v and v not in _PLACEHOLDER_VALUES:
             os.environ[k] = v
             print(f"[SECRETS] {k} configurado")
+        else:
+            # Remove placeholder para SmartRouter nao tentar o provider
+            if os.environ.get(k, "") in _PLACEHOLDER_VALUES:
+                os.environ.pop(k, None)
+                print(f"[SECRETS] {k} removido (placeholder)")
 
 _inject_secrets_to_env()
 

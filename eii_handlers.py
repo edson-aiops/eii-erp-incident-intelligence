@@ -17,6 +17,11 @@ from datetime import datetime
 from xml_parser import parse_esocial_xml
 from crag_pipeline import build_vector_store, run_crag
 
+try:
+    from notifier import send_hitl_alert as _send_hitl_alert
+except Exception:
+    _send_hitl_alert = None  # type: ignore
+
 # ── DB — mirrors app.py (same env var, same schema) ──────────────────────────
 
 _DEFAULT_DB = "eii_incidents.db"
@@ -142,7 +147,7 @@ def query_incident(xml_input: str) -> dict:
     diagnosis = run_crag(_get_collection(), parsed, inc_id)
     _db_save_pending(inc_id, diagnosis, datetime.now().isoformat())
 
-    return {
+    result = {
         "incident_id":      diagnosis.get("incident_id", inc_id),
         "evento":           diagnosis.get("evento", "—"),
         "codigo_erro":      diagnosis.get("codigo_erro", "—"),
@@ -154,6 +159,11 @@ def query_incident(xml_input: str) -> dict:
         "alerta_hitl":      diagnosis.get("alerta_hitl", "—"),
         "_meta":            diagnosis.get("_meta", {}),
     }
+
+    if _send_hitl_alert is not None:
+        _send_hitl_alert(result)
+
+    return result
 
 
 def escalate_incident(incident_id: str, status: str, notes: str = "") -> dict:

@@ -39,6 +39,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added (Fase 5 — v3.0 em progresso)
 
+- **feat(parser): suporte a EFD-Reinf — parse_xml_auto unificado** (2026-05-09)
+  - `xml_parser.py`: `EFDREINF_EVENTS` com 20 eventos R-* (R-1000..R-9001) e mapa evt→tag XML
+  - `parse_efdreinf_xml`: 3 formatos — retornoLoteEventos, retornoEvt* direto, genérico
+    - Suporta `cdRetorno`/`descRetorno` (EFD-Reinf) além de `cdResposta`/`descResposta`
+    - `sistema='efdreinf'` no `ParsedXML`, `evento_ids` extraídos do atributo `id=`
+  - `parse_xml_auto`: entrada unificada — detecta eSocial vs EFD-Reinf por namespace/tag raiz
+    - `parse_xml` alias atualizado para `parse_xml_auto` (backward compat mantida)
+  - `ParsedXML.sistema`: novo campo `'esocial'|'efdreinf'`
+  - `_extract_ocorrencias`: normaliza tipo `'1'/'2'/'3'` → `'ERROR'/'AVISO'/'INFO'` (EFD-Reinf)
+    e suporta tag `<localizacao>` além de `<localizacaoErro>`
+  - `scrub_pii`: máscaras LGPD para `cnpjPrestador`, `cnpjTomador`, `cnpjContri`, `cpfProdRural`
+  - `SAMPLE_XMLS`: 3 exemplos EFD-Reinf (R-1000/ERF001, R-2010/ERF010, R-2060/ERF021)
+  - `tests/test_efdreinf_parser.py`: 29 testes novos — suite total 37 passed
+
 - **feat(notifier): alertas HITL por e-mail** (2026-05-09)
   - `notifier.py` novo — stdlib pura, zero dependencias novas (smtplib + email.mime)
   - Config via keyring: `EII_SMTP_HOST`, `EII_SMTP_PORT`, `EII_SMTP_USER`,

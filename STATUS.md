@@ -144,7 +144,12 @@
   - KB074-KB093: 20 incidentes EFD-Reinf adicionados
   - Cobre: R-1000, R-2010, R-2020, R-2050, R-2060, R-2098, R-2099, R-4010, R-4020, R-4040, R-4080, R-4099, R-9001
   - Erros ERF001-ERF050 documentados com causa_raiz, passos_resolucao, validacao
-- [ ] Suporte a EFD-Reinf — eventos R-2010, R-2020, R-4010, etc.
+- [x] Suporte a EFD-Reinf — parser xml_parser.py com 20 eventos R-* e parse_xml_auto
+  - EFDREINF_EVENTS: R-1000, R-2010, R-2020, R-2050, R-2060, R-2098, R-2099, R-4010..R-4099, R-9001
+  - parse_efdreinf_xml: retornoLoteEventos + retornoEvt* + genérico; cdRetorno/descRetorno
+  - parse_xml_auto: entrada unificada detecta eSocial vs EFD-Reinf automaticamente
+  - PII scrubbing: cnpjPrestador, cnpjTomador, cnpjContri, cpfProdRural
+  - 29 novos testes (suite total: 37 passed)
 - [ ] API REST — integracao com JIRA e ServiceNow
 - [x] Notificacao por e-mail — alerta quando incidente aguarda HITL
   - `notifier.py`: stdlib pura (smtplib + email.mime), sem nova dependencia

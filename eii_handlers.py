@@ -14,7 +14,7 @@ import sqlite3
 import threading
 from datetime import datetime
 
-from xml_parser import parse_esocial_xml
+from xml_parser import parse_xml_auto as parse_esocial_xml
 from crag_pipeline import build_vector_store, run_crag
 
 try:

@@ -13,7 +13,7 @@ import os
 import hashlib
 from dotenv import load_dotenv
 from knowledge_base import KB
-from xml_parser import scrub_pii, parse_esocial_xml
+from xml_parser import scrub_pii, parse_xml_auto as parse_esocial_xml
 from llm_resilient import ResilientLLM
 from smartrouter.smart_router import SmartRouter
 from langsmith import traceable

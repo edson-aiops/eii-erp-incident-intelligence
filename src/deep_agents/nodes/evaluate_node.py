@@ -61,6 +61,20 @@ async def evaluate_node(state: AgentState) -> Dict[str, Any]:
         eval_result.get("verdict"), score, needs_refinement,
     )
 
+    try:
+        from observability import add_run_metadata
+        add_run_metadata({
+            "incident_id": state.get("incident_id"),
+            "eval_verdict": eval_result.get("verdict"),
+            "eval_score": round(score, 3),
+            "eval_iteration": iteration_count,
+            "needs_refinement": needs_refinement,
+            "criteria_passed": eval_result.get("criteria_passed", []),
+            "criteria_failed": eval_result.get("criteria_failed", []),
+        })
+    except Exception:
+        pass
+
     return {
         "evaluation_score": score,
         "evaluation_feedback": feedback,

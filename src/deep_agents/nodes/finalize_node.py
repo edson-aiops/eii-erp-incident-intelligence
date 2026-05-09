@@ -59,6 +59,23 @@ async def finalize_node(state: AgentState) -> Dict[str, Any]:
         len(final_result["passos_resolucao"]),
     )
 
+    try:
+        from observability import add_run_metadata
+        add_run_metadata({
+            "incident_id": incident_id,
+            "confianca": final_result["confianca"],
+            "severidade": final_result["severidade"],
+            "logprob_sim": logprob_sim,
+            "iteracoes": iteration_count,
+            "evaluation_score": state.get("evaluation_score"),
+            "routing_decision": state.get("routing_decision"),
+            "model_used": state.get("model_used"),
+            "referencias_kb": final_result.get("referencias_kb", []),
+            "has_hitl_alert": bool(final_result.get("alerta_hitl")),
+        })
+    except Exception:
+        pass
+
     return {"final_result": final_result}
 
 

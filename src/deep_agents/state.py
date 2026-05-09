@@ -44,3 +44,4 @@ class AgentState(TypedDict):
     errors: List[str]
     warnings: List[str]
     final_result: Optional[Dict[str, Any]]
+    proactive_insights: Optional[Dict[str, Any]]

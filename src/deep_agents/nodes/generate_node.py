@@ -68,6 +68,20 @@ async def generate_node(state: AgentState) -> Dict[str, Any]:
         incident_id, routing_decision, diagnosis.get("confianca", "?"),
     )
 
+    try:
+        from observability import add_run_metadata
+        add_run_metadata({
+            "incident_id": incident_id,
+            "routing_decision": routing_decision,
+            "confianca": diagnosis.get("confianca"),
+            "severidade": diagnosis.get("severidade"),
+            "fonte": diagnosis.get("fonte"),
+            "has_corrective_hint": bool(corrective_hint),
+            "kb_refs": diagnosis.get("referencias_kb", []),
+        })
+    except Exception:
+        pass
+
     return {"diagnosis": diagnosis, "model_used": routing_decision}
 
 

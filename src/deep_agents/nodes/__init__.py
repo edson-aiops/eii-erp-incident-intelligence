@@ -5,6 +5,7 @@ from .generate_node import generate_node
 from .evaluate_node import evaluate_node, should_reflexion
 from .reflexion_node import reflexion_node
 from .finalize_node import finalize_node, format_for_gradio
+from .intel_node import intel_node
 
 __all__ = [
     "parse_xml_node",
@@ -16,4 +17,5 @@ __all__ = [
     "reflexion_node",
     "finalize_node",
     "format_for_gradio",
+    "intel_node",
 ]

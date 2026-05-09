@@ -7,6 +7,7 @@ from src.deep_agents.nodes.generate_node import generate_node
 from src.deep_agents.nodes.evaluate_node import evaluate_node, should_reflexion
 from src.deep_agents.nodes.reflexion_node import reflexion_node
 from src.deep_agents.nodes.finalize_node import finalize_node
+from src.deep_agents.nodes.intel_node import intel_node
 
 def create_deep_agent_graph() -> StateGraph:
     workflow = StateGraph(AgentState)
@@ -17,6 +18,7 @@ def create_deep_agent_graph() -> StateGraph:
     workflow.add_node("evaluate", evaluate_node)
     workflow.add_node("reflexion", reflexion_node)
     workflow.add_node("finalize", finalize_node)
+    workflow.add_node("intel", intel_node)
 
     workflow.set_entry_point("parse")
     workflow.add_edge("parse", "router")
@@ -28,7 +30,8 @@ def create_deep_agent_graph() -> StateGraph:
         "finalize": "finalize"
     })
     workflow.add_edge("reflexion", "generate")
-    workflow.add_edge("finalize", END)
+    workflow.add_edge("finalize", "intel")
+    workflow.add_edge("intel", END)
 
     return workflow.compile()
 

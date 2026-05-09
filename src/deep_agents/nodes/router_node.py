@@ -63,4 +63,17 @@ async def smart_router_node(state: AgentState) -> Dict[str, Any]:
         context.evento, context.codigo_erro, severity, pi_detected, decision,
     )
 
+    try:
+        from observability import add_run_metadata
+        add_run_metadata({
+            "incident_id": state.get("incident_id"),
+            "evento": context.evento,
+            "codigo_erro": context.codigo_erro,
+            "severity": severity,
+            "pii_detected": pi_detected,
+            "routing_decision": decision,
+        })
+    except Exception:
+        pass
+
     return {"routing_decision": decision, "model_used": None}

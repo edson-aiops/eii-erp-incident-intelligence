@@ -33,7 +33,7 @@ docker run -p 7860:7860 --env-file .env eii
 
 ---
 
-## Arquitetura Atual (v3.0)
+## Arquitetura Atual (v3.1)
 
 O EII e um sistema de diagnostico de falhas de integracao eSocial/EFD-Reinf com pipeline CRAG,
 LangGraph Deep Agents, SmartRouter multi-LLM, HITL e observabilidade via LangSmith.
@@ -123,7 +123,7 @@ notifier.py             Alertas HITL por e-mail (smtplib stdlib)
 crag_pipeline.py        Pipeline CRAG principal
 smartrouter/            Roteamento multi-LLM (v1, em uso)
 smartrouter_v2/         Refatoracao modular (em desenvolvimento)
-xml_parser.py           Parse eSocial + PII scrub
+xml_parser.py           Parser unificado eSocial + EFD-Reinf (parse_xml_auto)
 knowledge_base.py       93 incidentes (eSocial + EFD-Reinf)
 eii_handlers.py         Handlers puros Python (MCP + API)
 mcp_server.py           Servidor MCP via fastmcp
@@ -189,12 +189,12 @@ DUAL_MODE.md            Arquitetura dual local/HF
 | 2 — Intelligence & Compliance | Concluida | v2.0 |
 | 3 — Production (SmartRouter + MCP + Auth) | Concluida | v2.2 |
 | 4 — Deep Agents (LangGraph + IntelAgent + API + Admin) | Concluida | v2.3 |
-| 5 — Observability & Scale (LangSmith + KB + Notifier) | Concluida | v3.0 |
+| 5 — Observability & Scale (LangSmith + KB 93 + EFD-Reinf parser + Notifier) | Concluida | v3.1 |
+| 6 — SaaS & Integracoes (Multitenancy + EFD-Reinf deep agents + app_hf.py v2) | Planejada | v4.0 |
 
-Proximo passo: a definir com o usuario.
 Detalhes completos em `STATUS.md`.
 
 ---
 
-**Ultima atualizacao:** 2026-05-09
+**Ultima atualizacao:** 2026-05-09 (v3.1 — Fase 5 concluida, Fase 6 planejada)
 **Autor:** Edson Oliveira + Claude

@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.0.1] — 2026-05-09
+
+### Fixed
+
+- **fix(ui): tema Monochrome causava texto branco em fundo branco** (`app.py`)
+  - Substituído `gr.themes.Monochrome()` por `gr.themes.Default()` (tema claro neutro)
+  - CSS expandido com overrides explícitos `color: #0f172a !important` para inputs,
+    textareas, labels e prose — elimina conflito de variáveis CSS do Gradio 6
+
+- **fix(smartrouter): modelo qwen-qwq-32b descontinuado no Groq** (`smartrouter/config.py`)
+  - `ProviderID.QWEN`: `qwen-qwq-32b` → `gemma2-9b-it` (Groq, ainda disponível)
+  - `ProviderID.DEEPSEEK`: `qwen-qwq-32b` → `llama-3.3-70b-versatile` (Groq)
+  - Modelo causava `Error code: 400 — model_decommissioned`, derrubando todo o pipeline
+    e forçando fallback para Ollama mesmo com GROQ_API_KEY configurada
+
+- **fix(smartrouter): pipeline caía para ollama-fallback por assinatura errada** (`crag_pipeline_smartrouter.py`, `app.py`)
+  - `app.py` importava `run_crag` (recebe `col, parsed_xml`) mas chamava com
+    `xml_content=xml, incident_id=...` — TypeError capturado silenciosamente, resultado: Ollama
+  - Adicionado wrapper `diagnosticar_incidente(xml_content, incident_id, ...)` em
+    `crag_pipeline_smartrouter.py` — mesma assinatura de `crag_pipeline.diagnosticar_incidente`,
+    inclui parse do XML, lazy cache do vector store e retorno `{"success": True, "diagnosis": {...}}`
+  - Import em `app.py` atualizado: `run_crag` → `diagnosticar_incidente`
+  - Pipeline agora usa Groq (llama-3.3-70b-versatile) corretamente e retorna `Backend: smartrouter`
+
+- **fix(debug): print de debug removido do login_page** (`app.py`)
+  - Removido `import hashlib as _hl` e `print(f"[DEBUG-LOGIN] ...")` adicionados na sessão anterior
+  - Linha servia para diagnóstico de hash mismatch no login — problema resolvido, código limpo
+
+---
+
 ## [Unreleased] — Fase 5
 
 ### Added (Fase 5 — v3.0 em progresso)

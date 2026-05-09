@@ -109,7 +109,7 @@ def ls_trace(name: str):
 SMARTROUTER_AVAILABLE = False
 try:
     # Importa apenas a função de diagnóstico do pipeline com SmartRouter
-    from crag_pipeline_smartrouter import run_crag as diagnosticar_incidente_sr
+    from crag_pipeline_smartrouter import diagnosticar_incidente as diagnosticar_incidente_sr
     SMARTROUTER_AVAILABLE = True
     print("✅ SmartRouter v2 loaded successfully")
 except ImportError as e:
@@ -1033,7 +1033,38 @@ def admin_change_password(session_token: str, new_pass: str, confirm_pass: str) 
 
 _CSS = """
 /* ── Reset e base ─────────────────────────────────────────── */
-.gradio-container { font-family: 'IBM Plex Sans', 'Inter', system-ui, sans-serif !important; }
+.gradio-container {
+    font-family: 'IBM Plex Sans', 'Inter', system-ui, sans-serif !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
+}
+
+/* ── Forçar texto escuro em todos os componentes ─────────── */
+.gradio-container input,
+.gradio-container textarea,
+.gradio-container .prose,
+.gradio-container p,
+.gradio-container span,
+.gradio-container label,
+.gradio-container .label-wrap span,
+.gradio-container .svelte-1ipelgc,
+.gradio-container [class*="block"] {
+    color: #0f172a !important;
+}
+
+/* ── Textbox inputs com fundo branco e texto escuro ───────── */
+.gradio-container input[type="text"],
+.gradio-container input[type="password"],
+.gradio-container textarea {
+    background: #ffffff !important;
+    color: #1e293b !important;
+    border: 1px solid #cbd5e1 !important;
+}
+.gradio-container input[type="text"]::placeholder,
+.gradio-container input[type="password"]::placeholder,
+.gradio-container textarea::placeholder {
+    color: #94a3b8 !important;
+}
 
 /* ── Login card ───────────────────────────────────────────── */
 .login-card {
@@ -1112,7 +1143,7 @@ _CSS = """
 
 with gr.Blocks(
     title="EII — ERP Incident Intelligence",
-    theme=gr.themes.Monochrome(),
+    theme=gr.themes.Default(),
     css=_CSS,
 ) as demo:
 

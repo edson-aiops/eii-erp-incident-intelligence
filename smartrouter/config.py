@@ -38,9 +38,9 @@ PROVIDERS: dict[str, ProviderConfig] = {
     ),
     ProviderID.QWEN: ProviderConfig(
         id=ProviderID.QWEN,
-        name="Qwen 3 235B (via Groq)",
+        name="Gemma 2 9B (via Groq)",
         base_url="https://api.groq.com/openai/v1",
-        model="qwen-qwq-32b",              # best free Qwen on Groq
+        model="gemma2-9b-it",
         api_key_env="GROQ_API_KEY",
         temperature=0.7,
         timeout_seconds=30.0,
@@ -81,9 +81,9 @@ PROVIDERS: dict[str, ProviderConfig] = {
     ),
     ProviderID.DEEPSEEK: ProviderConfig(
         id=ProviderID.DEEPSEEK,
-        name="QwQ 32B reasoning (via Groq)",
+        name="Llama 3.3 70B reasoning (via Groq)",
         base_url="https://api.groq.com/openai/v1",
-        model="qwen-qwq-32b",
+        model="llama-3.3-70b-versatile",
         api_key_env="GROQ_API_KEY",
         temperature=0.6,
         timeout_seconds=45.0,

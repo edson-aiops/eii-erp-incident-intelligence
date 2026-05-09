@@ -780,3 +780,59 @@ def run_crag(col: chromadb.Collection, parsed_xml, incident_id: str,
     }
     diagnosis["versao_kb"] = _KB_HASH
     return diagnosis
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# High-level wrapper — same signature as crag_pipeline.diagnosticar_incidente
+# so that app.py can import this interchangeably.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_col_cache = None
+_col_lock = __import__("threading").Lock()
+
+
+def _get_col():
+    global _col_cache
+    if _col_cache is None:
+        with _col_lock:
+            if _col_cache is None:
+                _col_cache = build_vector_store()
+    return _col_cache
+
+
+def diagnosticar_incidente(
+    xml_content: str,
+    incident_id: str,
+    error_code: str = None,
+    mentor_mode: bool = False,
+    force_cloud: bool = False,
+    force_local: bool = False,
+) -> dict:
+    """Wrapper compativel com crag_pipeline.diagnosticar_incidente.
+
+    Parses XML, builds/reuses vector store, runs full SmartRouter CRAG pipeline,
+    and returns a unified result dict with ``success``, ``diagnosis``, and ``_routing``.
+    """
+    from xml_parser import parse_esocial_xml
+
+    try:
+        parsed = parse_esocial_xml(xml_content)
+    except Exception as exc:
+        return {"success": False, "error": f"Falha ao parsear XML: {exc}", "incident_id": incident_id}
+
+    if parsed.erro:
+        return {"success": False, "error": f"XML invalido: {parsed.erro}", "incident_id": incident_id}
+
+    try:
+        col = _get_col()
+        diagnosis = run_crag(col, parsed, incident_id, mentor_mode=mentor_mode)
+        return {
+            "success":    True,
+            "incident_id": incident_id,
+            "diagnosis":  diagnosis,
+            "_routing":   {"route_used": diagnosis.get("_meta", {}).get("retrieval_backend", "smartrouter")},
+            # Flatten top-level keys expected by format_output
+            **{k: v for k, v in diagnosis.items() if k != "_routing"},
+        }
+    except Exception as exc:
+        return {"success": False, "error": str(exc), "incident_id": incident_id}

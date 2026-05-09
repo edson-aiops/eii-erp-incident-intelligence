@@ -8,7 +8,7 @@
 
 ## Onde Estamos Agora
 
-**Versao atual:** v2.2 (local) | v1.0 (HuggingFace publico)
+**Versao atual:** v3.0.1 (local) | v3.0 (HuggingFace publico)
 **Data de referencia:** 2026-05-08
 **Branch ativa:** `main`
 **App local rodando:** http://127.0.0.1:7860
@@ -18,7 +18,7 @@
 
 | Componente | Status | Observacao |
 |---|---|---|
-| `app.py` (local) | Funcionando | v2.2 com auth + SmartRouter + HITL |
+| `app.py` (local) | Funcionando | v3.0.1 — tema Default, CSS legível, SmartRouter Groq ativo |
 | `app_hf.py` (publico) | Funcionando | versao demo minima para HuggingFace |
 | `crag_pipeline.py` | Funcionando | CRAG completo com logprobs |
 | `smartrouter/` | Funcionando | 9 LLMs roteados |
@@ -90,6 +90,13 @@
   - `_read_wincred()` via `advapi32.CredReadW` — le GENERIC e DOMAIN_PASSWORD
   - resolve incompatibilidade entre `keyring` e credenciais no Vault
   - PR #2 mergeado em `main`
+- [x] **fix(smartrouter): qwen-qwq-32b descontinuado substituido** ← FEITO 2026-05-09
+  - `gemma2-9b-it` (QWEN) + `llama-3.3-70b-versatile` (DEEPSEEK) em `smartrouter/config.py`
+- [x] **fix(smartrouter): wrapper diagnosticar_incidente adicionado** ← FEITO 2026-05-09
+  - `crag_pipeline_smartrouter.py` — assinatura compatível com `crag_pipeline.diagnosticar_incidente`
+  - Pipeline agora usa Groq corretamente (antes caía em ollama-fallback por TypeError silencioso)
+- [x] **fix(ui): tema Gradio e CSS corrigidos** ← FEITO 2026-05-09
+  - `Monochrome` → `Default` + overrides CSS explícitos para texto escuro em fundo claro
 
 ---
 
@@ -246,6 +253,6 @@ for k in ['GROQ_API_KEY','EII_ADMIN_USER','EII_ADMIN_PASS','QDRANT_API_KEY']:
 
 ---
 
-**Ultima atualizacao:** 2026-05-09 (Fase 4 CONCLUIDA — IntelAgent + Upload XML + Admin + REST API)
+**Ultima atualizacao:** 2026-05-09 (v3.0.1 — fixes UI tema, SmartRouter qwen-qwq-32b, pipeline signature)
 **Autor:** Edson Oliveira
 **Mantido por:** obrigatorio — qualquer mudanca no projeto atualiza este arquivo

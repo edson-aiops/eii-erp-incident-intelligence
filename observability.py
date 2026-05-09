@@ -14,7 +14,10 @@ Usage in crag_pipeline.py::
         ...
 """
 
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
@@ -26,7 +29,11 @@ LANGSMITH_PROJECT = os.environ.get("LANGSMITH_PROJECT", "eii-esocial")
 # Optional import — fails silently when langsmith is not installed
 # ─────────────────────────────────────────────────────────────────────────────
 
-_LANGSMITH_API_KEY = os.environ.get("LANGSMITH_API_KEY", "")
+# Suporta tanto LANGSMITH_API_KEY (novo) quanto LANGCHAIN_API_KEY (legado)
+_LANGSMITH_API_KEY = (
+    os.environ.get("LANGSMITH_API_KEY")
+    or os.environ.get("LANGCHAIN_API_KEY", "")
+)
 
 try:
     from langsmith import traceable as _real_traceable  # type: ignore
@@ -37,9 +44,11 @@ except ImportError:
 
 _ENABLED = _LANGSMITH_AVAILABLE and bool(_LANGSMITH_API_KEY)
 
-# Propagate project name to langsmith env var if enabled
+# Propaga project name e habilita tracing quando configurado
 if _ENABLED:
     os.environ.setdefault("LANGSMITH_PROJECT", LANGSMITH_PROJECT)
+    os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+    logger.info("[observability] LangSmith tracing enabled — project=%s", LANGSMITH_PROJECT)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -60,6 +69,28 @@ def get_tracer():
         return Client(api_key=_LANGSMITH_API_KEY)
     except Exception:
         return None
+
+
+def add_run_metadata(metadata: dict) -> None:
+    """Enriquece o span LangSmith ativo com metadata adicional.
+
+    Util para adicionar campos de negocio (incident_id, evento, confianca)
+    ao span criado automaticamente pelo LangGraph ou por @traceable sem
+    precisar criar um novo span filho.
+
+    No-op quando LangSmith nao esta configurado.
+    """
+    if not _ENABLED:
+        return
+    try:
+        from langsmith.run_helpers import get_current_run_tree  # type: ignore
+        rt = get_current_run_tree()
+        if rt is not None:
+            current_extra = dict(rt.extra or {})
+            current_extra.update(metadata)
+            rt.extra = current_extra
+    except Exception as e:
+        logger.debug("[observability] add_run_metadata failed: %s", e)
 
 
 def traceable(name: str = None, run_type: str = "chain",

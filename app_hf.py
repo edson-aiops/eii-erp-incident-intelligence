@@ -1,4 +1,4 @@
-﻿"""
+"""
 EII — ERP Incident Intelligence (PUBLIC DEMO v2.3)
 Versão para HuggingFace Spaces: CRAG Pipeline + PII Scrubbing + Groq Cloud
 """

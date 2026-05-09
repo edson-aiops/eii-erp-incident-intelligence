@@ -1031,79 +1031,195 @@ def admin_change_password(session_token: str, new_pass: str, confirm_pass: str) 
 # Interface Gradio
 # ─────────────────────────────────────────────────────────────────────────────
 
-with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Default(), css="""
-    .login-container {max-width: 400px; margin: 80px auto; padding: 2rem; border: 1px solid #e5e7eb; border-radius: 8px;}
-    .main-interface {max-width: 1200px; margin: 0 auto;}
-    .error-box {border-left: 4px solid #ef4444; background: #fef2f2; padding: 0.5rem 1rem;}
-""") as demo:
-    
+_CSS = """
+/* ── Reset e base ─────────────────────────────────────────── */
+.gradio-container { font-family: 'IBM Plex Sans', 'Inter', system-ui, sans-serif !important; }
+
+/* ── Login card ───────────────────────────────────────────── */
+.login-card {
+    max-width: 420px;
+    margin: 80px auto;
+    padding: 2.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+    background: #ffffff;
+}
+.login-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.25rem;
+}
+.login-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin-bottom: 1.5rem;
+}
+
+/* ── Header principal ─────────────────────────────────────── */
+.app-header {
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.app-title {
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+}
+.user-badge {
+    font-size: 0.8rem;
+    color: #475569;
+    padding: 4px 10px;
+    background: #f1f5f9;
+    border-radius: 20px;
+    display: inline-block;
+}
+
+/* ── Painel de resultado ──────────────────────────────────── */
+.output-panel {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1.25rem;
+    min-height: 420px;
+}
+
+/* ── Opções avançadas ─────────────────────────────────────── */
+.advanced-opts label {
+    font-size: 0.85rem !important;
+    color: #475569 !important;
+}
+
+/* ── Erro ─────────────────────────────────────────────────── */
+.error-box {
+    border-left: 4px solid #ef4444;
+    background: #fef2f2;
+    padding: 0.5rem 1rem;
+    border-radius: 0 6px 6px 0;
+}
+
+/* ── Footer ───────────────────────────────────────────────── */
+.footer-note {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    text-align: right;
+    margin-top: 0.5rem;
+}
+"""
+
+with gr.Blocks(
+    title="EII — ERP Incident Intelligence",
+    theme=gr.themes.Monochrome(),
+    css=_CSS,
+) as demo:
+
     session_token = gr.State("")
-    current_user = gr.State("")
-    
-    with gr.Column(elem_classes=["login-container"]) as login_container:
-        gr.Markdown("# 🔐 EII — ERP Incident Intelligence\n### Sistema de Diagnóstico Inteligente de Incidentes eSocial\n\n**Acesso Restrito — Requer Autenticação**")
-        username_input = gr.Textbox(label="Usuário", placeholder="Digite seu usuário", value="admin")
-        password_input = gr.Textbox(label="Senha", type="password", placeholder="Digite sua senha")
-        login_btn = gr.Button("🔓 Entrar", variant="primary", size="lg")
-        login_msg = gr.Markdown("")
-        gr.Markdown("---\n*💡 Dica: Configure credenciais no `.env` ou use Credential Manager*")
-    
-    with gr.Column(elem_classes=["main-interface"], visible=False) as main_interface:
-        with gr.Row():
-            gr.Markdown("# 🤖 EII — ERP Incident Intelligence")
-            user_info = gr.Markdown("")
-            logout_btn = gr.Button("🚪 Sair", variant="stop", size="sm")
+    current_user  = gr.State("")
+
+    # ── Login ──────────────────────────────────────────────────────────────
+    with gr.Column(elem_classes=["login-card"]) as login_container:
+        gr.Markdown("**EII — ERP Incident Intelligence**", elem_classes=["login-title"])
+        gr.Markdown("Sistema de diagnóstico de incidentes eSocial · Acesso restrito", elem_classes=["login-subtitle"])
+        username_input = gr.Textbox(label="Usuário", placeholder="seu.usuario")
+        password_input = gr.Textbox(label="Senha", type="password", placeholder="••••••••")
+        login_btn      = gr.Button("Entrar", variant="primary", size="lg")
+        login_msg      = gr.Markdown("")
+        gr.Markdown("_Credenciais via Windows Credential Manager ou `.env`_", elem_classes=["login-subtitle"])
+
+    # ── App principal ──────────────────────────────────────────────────────
+    with gr.Column(visible=False) as main_interface:
+
+        # Header
+        with gr.Row(elem_classes=["app-header"]):
+            gr.Markdown("**EII — ERP Incident Intelligence**", elem_classes=["app-title"])
+            user_info  = gr.Markdown("", elem_classes=["user-badge"])
+            logout_btn = gr.Button("Sair", variant="secondary", size="sm")
 
         with gr.Tabs():
 
-            # ── Aba Diagnóstico ───────────────────────────────────────────────
+            # ── Aba Diagnóstico ───────────────────────────────────────────
             with gr.Tab("Diagnóstico"):
-                gr.Markdown("### Diagnóstico inteligente de incidentes eSocial com IA e roteamento LGPD")
 
                 with gr.Row():
-                    with gr.Column(scale=1):
+
+                    # Coluna input (menor)
+                    with gr.Column(scale=2):
                         xml_upload = gr.File(
                             label="Carregar arquivo XML",
                             file_types=[".xml"],
                             file_count="single",
                         )
                         upload_status = gr.Markdown(visible=False)
-                        xml_input = gr.Textbox(label="XML do eSocial", lines=12, placeholder="Cole o conteúdo XML completo aqui ou carregue um arquivo acima...")
-                        incident_id = gr.Textbox(label="ID do Incidente", value=f"INC-{datetime.now().strftime('%Y%m%d-%H%M')}", interactive=True)
-                        error_code = gr.Textbox(label="Código de Erro (opcional)")
-
+                        xml_input = gr.Textbox(
+                            label="XML eSocial / EFD-Reinf",
+                            lines=14,
+                            placeholder="Cole o conteúdo XML completo aqui\nou carregue um arquivo acima...",
+                        )
                         with gr.Row():
-                            mentor_mode = gr.Checkbox(label="🎓 Modo Mentor + Checklist HITL", value=False)
-                            force_local = gr.Checkbox(label="🏭 Forçar Local (Ollama)", value=False)
+                            incident_id = gr.Textbox(
+                                label="ID do Incidente",
+                                value=f"INC-{datetime.now().strftime('%Y%m%d-%H%M')}",
+                                scale=2,
+                            )
+                            error_code = gr.Textbox(label="Código de Erro", scale=1)
+
+                        mentor_mode = gr.Checkbox(
+                            label="Modo Mentor — explicação didática para analistas juniores",
+                            value=False,
+                        )
+
+                        with gr.Accordion("Opções avançadas", open=False, elem_classes=["advanced-opts"]):
+                            force_local = gr.Checkbox(label="Forçar Ollama local (LGPD total)", value=False)
                             if SMARTROUTER_AVAILABLE:
                                 use_smartrouter = gr.Checkbox(
-                                    label="🧠 SmartRouter (multi-LLM)",
+                                    label="SmartRouter — roteamento multi-LLM com fallback",
                                     value=False,
-                                    info="Roteamento inteligente multi-LLM com fallback resiliente"
                                 )
                             else:
                                 use_smartrouter = gr.State(False)
                             if DEEP_AGENTS_AVAILABLE:
                                 use_deep_agents = gr.Checkbox(
-                                    label="🤖 Deep Agents (LangGraph v2.3)",
+                                    label="Deep Agents — pipeline LangGraph (parse → route → generate → evaluate → reflexion)",
                                     value=False,
-                                    info="Pipeline multi-agente: parse → route → retrieve → generate → evaluate → reflexion"
                                 )
                             else:
                                 use_deep_agents = gr.State(False)
 
-                        diagnose_btn = gr.Button("🚀 Diagnosticar", variant="primary", size="lg")
+                        diagnose_btn = gr.Button("Diagnosticar", variant="primary", size="lg")
 
-                    with gr.Column(scale=2):
-                        output = gr.Markdown(label="Resultado do Diagnóstico")
+                    # Coluna output (maior)
+                    with gr.Column(scale=3):
+                        output = gr.Markdown(
+                            value=(
+                                "### Como usar\n\n"
+                                "1. Cole o XML rejeitado no campo ao lado\n"
+                                "2. Clique em **Diagnosticar**\n"
+                                "3. Revise causa raiz e passos de resolução\n"
+                                "4. Aprove ou rejeite na aba de Aprovação HITL\n\n"
+                                "---\n"
+                                "_Pipeline CRAG com Knowledge Base de 93 incidentes documentados "
+                                "(eSocial + EFD-Reinf) e PII Scrubbing automático (LGPD)._"
+                            ),
+                            elem_classes=["output-panel"],
+                        )
                         insights_output = gr.Markdown(visible=False)
-                        error_output = gr.Textbox(label="⚠️ Mensagens de Erro", visible=False, interactive=False, elem_classes=["error-box"])
+                        error_output    = gr.Textbox(
+                            label="Erros",
+                            visible=False,
+                            interactive=False,
+                            elem_classes=["error-box"],
+                        )
 
-                gr.Markdown(f"\n*Versão: {datetime.now().strftime('%d/%m/%Y')} | LGPD: Integrado | Python 3.13 Ready | 🔒 Autenticado*")
+                gr.Markdown(
+                    f"v3.0 · {datetime.now().strftime('%d/%m/%Y')} · LGPD ativo · KB: 93 incidentes",
+                    elem_classes=["footer-note"],
+                )
 
-            # ── Aba Admin ─────────────────────────────────────────────────────
+            # ── Aba Admin ─────────────────────────────────────────────────
             with gr.Tab("Admin"):
-                gr.Markdown("## Painel Administrativo")
 
                 with gr.Tabs():
 
@@ -1111,7 +1227,7 @@ with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Defaul
                         sessions_output = gr.Markdown("_Clique em Atualizar para carregar._")
                         with gr.Row():
                             sessions_refresh_btn = gr.Button("Atualizar", size="sm")
-                            sessions_revoke_btn = gr.Button("Revogar todas (exceto atual)", variant="stop", size="sm")
+                            sessions_revoke_btn  = gr.Button("Revogar todas (exceto atual)", variant="stop", size="sm")
                         sessions_action_msg = gr.Markdown("")
 
                     with gr.Tab("Métricas"):
@@ -1122,11 +1238,11 @@ with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Defaul
                         metrics_refresh_btn = gr.Button("Atualizar", size="sm")
 
                     with gr.Tab("Alterar Senha"):
-                        gr.Markdown("A senha é salva no Windows Credential Manager e o hash é atualizado imediatamente nesta sessão.")
-                        new_pass_input = gr.Textbox(label="Nova senha", type="password", placeholder="Mínimo 8 caracteres")
+                        gr.Markdown("A senha é salva no Windows Credential Manager e o hash é atualizado na sessão atual.")
+                        new_pass_input     = gr.Textbox(label="Nova senha", type="password", placeholder="Mínimo 8 caracteres")
                         confirm_pass_input = gr.Textbox(label="Confirmar nova senha", type="password")
-                        change_pass_btn = gr.Button("Alterar senha", variant="primary")
-                        change_pass_msg = gr.Markdown("")
+                        change_pass_btn    = gr.Button("Alterar senha", variant="primary")
+                        change_pass_msg    = gr.Markdown("")
     
     # Event Handlers
     login_btn.click(fn=login_page, inputs=[username_input, password_input], outputs=[login_msg, session_token, current_user, login_container, main_interface]).then(fn=get_user_display, inputs=[current_user], outputs=[user_info])
@@ -1187,16 +1303,9 @@ with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Defaul
 
 if __name__ == "__main__":
     os.environ["GRADIO_ANALYTICS_ENABLED"] = "false"
-    print("🚀 Iniciando EII Dashboard v2.3 (Mentor + SmartRouter + Deep Agents + Observability)...")
-    print(f"📊 Acesse: http://127.0.0.1:7860")
-    print(f"🔐 Login: usa Credential Manager ou .env")
-    print(f"🛡️ Segurança: Rate limit={RATE_LIMIT_REQUESTS}req/{RATE_LIMIT_WINDOW}s | Session timeout={SESSION_TIMEOUT_MINUTES}min")
-    if SMARTROUTER_AVAILABLE:
-        print("🧠 SmartRouter: Disponível (marque o checkbox para usar)")
-    else:
-        print("⚠️ SmartRouter: Não disponível (usando pipeline padrão)")
-    if DEEP_AGENTS_AVAILABLE:
-        print("🤖 Deep Agents (LangGraph): Disponível (marque o checkbox para usar)")
-    else:
-        print("⚠️ Deep Agents: Não disponível")
+    print("EII — ERP Incident Intelligence v3.0")
+    print("Acesse: http://127.0.0.1:7860")
+    print(f"Rate limit: {RATE_LIMIT_REQUESTS}req/{RATE_LIMIT_WINDOW}s | Timeout sessao: {SESSION_TIMEOUT_MINUTES}min")
+    print(f"SmartRouter: {'disponivel' if SMARTROUTER_AVAILABLE else 'indisponivel'}")
+    print(f"Deep Agents: {'disponivel' if DEEP_AGENTS_AVAILABLE else 'indisponivel'}")
     demo.launch(server_name="127.0.0.1", server_port=7860, quiet=True)

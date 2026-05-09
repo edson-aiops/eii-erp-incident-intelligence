@@ -23,7 +23,7 @@ if str(project_root) not in sys.path:
 # ─────────────────────────────────────────────────────────────────────────────
 _KB: list[dict] = []
 try:
-    from knowledge_base import KNOWLEDGE_BASE
+    from knowledge_base import KB as KNOWLEDGE_BASE
     _KB = KNOWLEDGE_BASE
     print(f"[EII] Knowledge Base: {len(_KB)} incidentes")
 except Exception as _e:
@@ -353,7 +353,7 @@ def _build_kb_table() -> list[list[str]]:
 # UI Gradio
 # ─────────────────────────────────────────────────────────────────────────────
 
-with gr.Blocks(title="EII — ERP Incident Intelligence", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="EII — ERP Incident Intelligence") as demo:
 
     gr.Markdown("""
 # EII — ERP Incident Intelligence
@@ -378,7 +378,6 @@ Cole o XML rejeitado pela plataforma e receba a causa raiz e os passos de resolu
                         label="XML eSocial / EFD-Reinf",
                         lines=16,
                         placeholder="Cole o XML de retorno rejeitado aqui...",
-                        show_copy_button=True,
                     )
                     mentor_mode = gr.Checkbox(
                         label="Modo Mentor — explicacao didatica para analistas juniores",

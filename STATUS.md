@@ -164,14 +164,10 @@
 - [ ] Multitenancy — isolar dados por empresa (tenant_id em SQLite, ChromaDB e auth)
   - Requisito: segunda empresa real solicitando acesso
   - Impacto: auth, SQLite, ChromaDB, API, app.py
-- [ ] RAGAS evaluation — faithfulness + relevancy por colecao KB
-  - Requisito: aprovacao de nova dependencia (`pip install ragas`) em requirements.txt
-- [ ] API REST — integracao com JIRA e ServiceNow
-  - Requisito: credenciais JIRA_API_KEY e SERVICENOW_URL configuradas via keyring
 - [ ] Pipeline EFD-Reinf completo — eventos R-* no deep agents router_node
 - [ ] app_hf.py v2 — demo publica com EFD-Reinf e KB lookup visivel
 
-**Dependencias:** piloto com empresa real, aprovacao de dependencias externas
+**Dependencias:** piloto com empresa real
 
 ---
 

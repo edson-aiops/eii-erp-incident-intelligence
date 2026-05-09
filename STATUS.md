@@ -8,8 +8,8 @@
 
 ## Onde Estamos Agora
 
-**Versao atual:** v3.0.1 (local) | v3.0 (HuggingFace publico)
-**Data de referencia:** 2026-05-08
+**Versao atual:** v3.1 (local) | v3.0 (HuggingFace publico)
+**Data de referencia:** 2026-05-09
 **Branch ativa:** `main`
 **App local rodando:** http://127.0.0.1:7860
 **App publico (HF):** https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence
@@ -128,29 +128,27 @@
 
 ---
 
-### Fase 5 — Observability & Scale [PLANEJADO] `v3.0`
+### Fase 5 — Observability & Scale [CONCLUIDA] `v3.1`
 
 - [x] LangSmith traces completos — um span por agente
   - observability.py: suporte a LANGSMITH_API_KEY + LANGCHAIN_API_KEY, add_run_metadata()
   - router/generate/evaluate/finalize/intel nodes: add_run_metadata com campos de negocio
   - IntelAgent.run(): @traceable via observability (span EII.IntelAgent.run)
   - api.py: _traced_diagnose com @traceable (span EII.API.diagnose)
-- [ ] RAGAS evaluation — faithfulness + relevancy por colecao KB
 - [x] Dashboard de metricas — MTTR, taxa de resolucao automatica, escalation rate
   - admin_get_metrics() retorna (kpi_md, fig_status, fig_trend) com matplotlib
-  - gr.Plot para gráficos de status (barra horizontal) e tendência (linha 30d)
-  - Aba "Métricas" no painel admin do app.py
+  - gr.Plot para graficos de status (barra horizontal) e tendencia (linha 30d)
+  - Aba "Metricas" no painel admin do app.py
 - [x] KB expandida — 93 incidentes (era 73), EFD-Reinf cobertura completa
   - KB074-KB093: 20 incidentes EFD-Reinf adicionados
   - Cobre: R-1000, R-2010, R-2020, R-2050, R-2060, R-2098, R-2099, R-4010, R-4020, R-4040, R-4080, R-4099, R-9001
   - Erros ERF001-ERF050 documentados com causa_raiz, passos_resolucao, validacao
 - [x] Suporte a EFD-Reinf — parser xml_parser.py com 20 eventos R-* e parse_xml_auto
   - EFDREINF_EVENTS: R-1000, R-2010, R-2020, R-2050, R-2060, R-2098, R-2099, R-4010..R-4099, R-9001
-  - parse_efdreinf_xml: retornoLoteEventos + retornoEvt* + genérico; cdRetorno/descRetorno
+  - parse_efdreinf_xml: retornoLoteEventos + retornoEvt* + generico; cdRetorno/descRetorno
   - parse_xml_auto: entrada unificada detecta eSocial vs EFD-Reinf automaticamente
   - PII scrubbing: cnpjPrestador, cnpjTomador, cnpjContri, cpfProdRural
   - 29 novos testes (suite total: 37 passed)
-- [ ] API REST — integracao com JIRA e ServiceNow
 - [x] Notificacao por e-mail — alerta quando incidente aguarda HITL
   - `notifier.py`: stdlib pura (smtplib + email.mime), sem nova dependencia
   - Config: EII_SMTP_HOST/PORT/USER/PASS + EII_ALERT_EMAIL via keyring
@@ -158,9 +156,22 @@
   - HTML com severidade, causa raiz, passos e link para o dashboard
   - Suporta TLS (porta 587) e SSL (porta 465); multiplos destinatarios (virgula)
   - Integrado em `eii_handlers.query_incident()` pos _db_save_pending
-- [ ] Multitenancy — isolar dados por empresa (para virar SaaS)
 
-**Dependencias:** Fase 4 concluida, validacao com empresa real
+---
+
+### Fase 6 — SaaS & Integrações [PLANEJADO] `v4.0`
+
+- [ ] Multitenancy — isolar dados por empresa (tenant_id em SQLite, ChromaDB e auth)
+  - Requisito: segunda empresa real solicitando acesso
+  - Impacto: auth, SQLite, ChromaDB, API, app.py
+- [ ] RAGAS evaluation — faithfulness + relevancy por colecao KB
+  - Requisito: aprovacao de nova dependencia (`pip install ragas`) em requirements.txt
+- [ ] API REST — integracao com JIRA e ServiceNow
+  - Requisito: credenciais JIRA_API_KEY e SERVICENOW_URL configuradas via keyring
+- [ ] Pipeline EFD-Reinf completo — eventos R-* no deep agents router_node
+- [ ] app_hf.py v2 — demo publica com EFD-Reinf e KB lookup visivel
+
+**Dependencias:** piloto com empresa real, aprovacao de dependencias externas
 
 ---
 

@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.1] — 2026-05-09
+
+### Changed
+
+- **chore(roadmap): Fase 5 encerrada como [CONCLUIDA] — Fase 6 criada**
+  - Fase 5 entregou: LangSmith traces, dashboard métricas, KB 93 incidentes,
+    suporte EFD-Reinf (parser + integração), notificador e-mail HITL
+  - Itens não priorizados movidos para Fase 6 (SaaS & Integrações `v4.0`):
+    Multitenancy, RAGAS evaluation, API JIRA/ServiceNow,
+    pipeline EFD-Reinf deep agents, app_hf.py v2
+  - Versão bumped: v3.0.1 → v3.1
+
+---
+
 ## [3.0.1] — 2026-05-09
 
 ### Fixed

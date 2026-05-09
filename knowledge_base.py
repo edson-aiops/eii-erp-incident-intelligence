@@ -1533,4 +1533,427 @@ KB = [
         "impacto": "alto",
         "tags": ["S-2240", "E529", "agente nocivo", "LTCAT", "PPP", "codAgNoc", "tpAval", "NR-15", "aposentadoria especial", "condições ambientais"]
     },
+
+    # ══════════════════════════════════════════════════════════════════════════════
+    # EFD-REINF — Escrituração Fiscal Digital de Retenções e Outras Informações
+    # KB074-KB093
+    # ══════════════════════════════════════════════════════════════════════════════
+
+    # ── R-1000 — INFORMAÇÕES DO CONTRIBUINTE (KB074) ───────────────────────────
+    {
+        "id": "KB074",
+        "evento": "R-1000",
+        "codigo_erro": "ERF001",
+        "titulo": "R-1000 rejeitado — CNPJ do contribuinte não cadastrado ou divergente na RFB",
+        "descricao": "Evento R-1000 (Informações do Contribuinte) rejeitado com ERF001. O CNPJ informado no campo cnpjContri não está ativo no cadastro da Receita Federal ou apresenta divergência nos dados cadastrais (razão social, natureza jurídica, regime de tributação).",
+        "causa_raiz": "O R-1000 é o evento de abertura da EFD-Reinf e exige que o CNPJ do contribuinte esteja ativo e com dados consistentes na RFB. O ERF001 ocorre quando: o CNPJ foi baixado ou está inapto; o regime de tributação informado (indApuracao: mensal=1, anual=2) não corresponde ao enquadramento do contribuinte; a classificação tributária (classTrib) é incompatível com a atividade econômica; ou o CNPJ da matriz foi informado em filial ou vice-versa.",
+        "passos_resolucao": [
+            "Consultar a situação cadastral do CNPJ no portal da RFB (Comprovante de Inscrição e de Situação Cadastral) para confirmar que está ativo",
+            "Verificar o campo classTrib (classificação tributária): código 01=Lucro Real, 02=Lucro Presumido, 03=Lucro Arbitrado, 04=Simples Nacional, 05=MEI, 06=Imune/Isenta — confirmar aderência ao enquadramento fiscal",
+            "Confirmar o indApuracao: contribuintes mensais usam 1, anuais (IRPJ anual com estimativas) usam 2 — para a EFD-Reinf o padrão é 1 (mensal)",
+            "Verificar se o CNPJ informado é da matriz ou da filial responsável pela escrituração — a EFD-Reinf pode ser consolidada pela matriz",
+            "Corrigir os campos divergentes e retransmitir o R-1000, aguardando o recibo de processamento (nrRec) antes de enviar eventos dependentes"
+        ],
+        "validacao": "R-1000 aceito com cdResposta=0. Verificar na área do contribuinte no e-CAC que o período de apuração está aberto e que os eventos da série R-2xxx podem ser transmitidos.",
+        "tempo_estimado": "1-2h (pode exigir consulta ao contador e atualização cadastral na RFB)",
+        "impacto": "crítico",
+        "tags": ["R-1000", "ERF001", "EFD-Reinf", "CNPJ contribuinte", "classTrib", "indApuracao", "abertura escrituração", "RFB"]
+    },
+
+    # ── R-2010 — RETENÇÕES NA FONTE — SERVIÇOS TOMADOS (KB075) ─────────────────
+    {
+        "id": "KB075",
+        "evento": "R-2010",
+        "codigo_erro": "ERF010",
+        "titulo": "R-2010 rejeitado — CNPJ do prestador inválido ou retenção de CSLL/COFINS/PIS divergente",
+        "descricao": "Evento R-2010 (Retenções na Fonte — Serviços Tomados/Contratados) rejeitado com ERF010. O CNPJ do prestador de serviços (cnpjPrestador) não está ativo na RFB, ou os valores de retenção de CSLL, COFINS e PIS/PASEP calculados divergem do percentual legal sobre o valor bruto da nota fiscal.",
+        "causa_raiz": "O R-2010 registra as retenções do tomador sobre serviços contratados de pessoas jurídicas. O ERF010 ocorre por: CNPJ do prestador baixado, inapto ou com CNPJ de CPF informado incorretamente; valor da retenção (vlrCsll, vlrCofins, vlrPis) não corresponde a 4,65% (CSLL 1% + COFINS 3% + PIS 0,65%) sobre vlrBruto quando aplicável; natureza do rendimento (natRend) incompatível com o serviço descrito na NF; ou a NF já foi informada em período anterior (duplicidade por nrNF + cnpjPrestador + dtFatamento).",
+        "passos_resolucao": [
+            "Validar o CNPJ do prestador consultando a situação cadastral na RFB — se inativo, entrar em contato com o prestador para regularização",
+            "Calcular as retenções: CSLL = vlrBruto × 1%, COFINS = vlrBruto × 3%, PIS = vlrBruto × 0,65% — verificar se o serviço está sujeito à retenção conforme IN RFB 1.234/2012 e alterações",
+            "Confirmar a natRend (natureza do rendimento): código conforme Tabela 1 da EFD-Reinf — serviços de limpeza=10308, vigilância=10301, TI=11301, construção civil=10208",
+            "Verificar duplicidade: comparar nrNF + serie + cnpjPrestador + dtFatamento com registros já transmitidos no mesmo período",
+            "Corrigir o R-2010 e retransmitir, ou enviar R-2010 com indRetif=2 (retificador) referenciando o nrRec do registro anterior"
+        ],
+        "validacao": "R-2010 aceito. Conferir no DARF gerado pelo sistema que os códigos de receita estão corretos: 5952 (CSLL), 5960 (COFINS), 5979 (PIS) para retenções de serviços.",
+        "tempo_estimado": "1-3h",
+        "impacto": "alto",
+        "tags": ["R-2010", "ERF010", "EFD-Reinf", "retenção fonte", "CSLL", "COFINS", "PIS", "serviços tomados", "CNPJ prestador", "natRend"]
+    },
+
+    # ── R-2020 — RETENÇÕES NA FONTE — SERVIÇOS PRESTADOS (KB076) ───────────────
+    {
+        "id": "KB076",
+        "evento": "R-2020",
+        "codigo_erro": "ERF011",
+        "titulo": "R-2020 rejeitado — CNPJ do tomador inválido ou valor de retenção sofrida inconsistente",
+        "descricao": "Evento R-2020 (Retenções na Fonte — Serviços Prestados) rejeitado com ERF011. O CNPJ do tomador de serviços (cnpjTomador) não está ativo ou os valores de retenção sofrida pelo prestador divergem do comprovante de retenção emitido pelo tomador.",
+        "causa_raiz": "O R-2020 é o espelho do R-2010 sob a perspectiva do prestador. O ERF011 ocorre por: CNPJ do tomador inválido ou não cadastrado na RFB; valor de retenção sofrida (vlrRetencao) não conferente com o informe de retenção do tomador; o período de competência (perApur) não corresponde à data de faturamento da NF; ou o registro foi enviado com indRetif=1 para NF já informada anteriormente.",
+        "passos_resolucao": [
+            "Solicitar ao tomador o comprovante de retenção (DARF ou documento equivalente) e comparar com os valores informados no R-2020",
+            "Validar o CNPJ do tomador na RFB — se for órgão público, verificar se o código do órgão (cnpjTomador) está correto",
+            "Verificar o perApur: deve corresponder ao mês/ano do faturamento, não ao mês de recebimento",
+            "Checar se há R-2020 já transmitido para a mesma NF — se sim, enviar R-2020 retificador com indRetif=2",
+            "Confirmar que o total de retenções sofridas no R-2020 será confrontado pela RFB com o R-2010 enviado pelo tomador"
+        ],
+        "validacao": "R-2020 aceito. Verificar que as retenções sofridas estão sendo utilizadas para compensação ou restituição no DCTF/DCTFWEB do contribuinte.",
+        "tempo_estimado": "1-2h",
+        "impacto": "médio",
+        "tags": ["R-2020", "ERF011", "EFD-Reinf", "retenção sofrida", "serviços prestados", "CNPJ tomador", "perApur", "compensação"]
+    },
+
+    # ── R-2050 — COMERCIALIZAÇÃO PRODUÇÃO RURAL (KB077) ────────────────────────
+    {
+        "id": "KB077",
+        "evento": "R-2050",
+        "codigo_erro": "ERF020",
+        "titulo": "R-2050 rejeitado — CPF/CNPJ do produtor rural inválido ou FUNRURAL inconsistente",
+        "descricao": "Evento R-2050 (Comercialização da Produção Rural) rejeitado com ERF020. O CPF ou CNPJ do produtor rural (cpfProdRural ou cnpjProdRural) não está ativo ou o valor de FUNRURAL (contribuição previdenciária sobre a receita bruta da comercialização) está inconsistente com as alíquotas legais.",
+        "causa_raiz": "O R-2050 registra a retenção de FUNRURAL quando a empresa adquire produção de produtor rural pessoa física ou jurídica. O ERF020 ocorre por: CPF do produtor rural inativo ou com pendências no CadastroSync; alíquota de FUNRURAL aplicada incorretamente — pessoa física: 1,2% (FUNRURAL) + 0,1% (RAT) + 0,2% (SENAR) = 1,5%; pessoa jurídica: 1,7% + 0,1% (RAT) + 0,25% (SENAR) = 2,05%; base de cálculo incorreta (deve ser o valor bruto da NF do produtor, excluindo ICMS se houver destaque); ou adquirente não está obrigado à retenção (MEI adquirente é dispensado).",
+        "passos_resolucao": [
+            "Verificar a situação do CPF/CNPJ do produtor rural no portal da RFB e na base do PRONAF/SNCR se aplicável",
+            "Recalcular o FUNRURAL: para PF = vlrBruto × 1,5%; para PJ = vlrBruto × 2,05% — verificar se há destaque de ICMS na NF para exclusão da base",
+            "Confirmar que o adquirente está obrigado à retenção — empresas em geral e cooperativas são obrigadas; MEI adquirente é dispensado; consumidor final pessoa física é dispensado",
+            "Verificar o campo tpAquis (tipo de aquisição): 1=compra, 2=consignação, 3=doação — o tipo afeta a obrigatoriedade",
+            "Retransmitir R-2050 corrigido ou enviar retificador com indRetif=2"
+        ],
+        "validacao": "R-2050 aceito. Confirmar que o DARF do FUNRURAL (código 2615) foi gerado com o valor correto para pagamento até o dia 20 do mês subsequente.",
+        "tempo_estimado": "1-2h",
+        "impacto": "médio",
+        "tags": ["R-2050", "ERF020", "EFD-Reinf", "FUNRURAL", "produtor rural", "comercialização produção", "SENAR", "RAT", "contribuição previdenciária rural"]
+    },
+
+    # ── R-2060 — CONTRIBUIÇÃO PREVIDENCIÁRIA SOBRE A RECEITA BRUTA (KB078) ─────
+    {
+        "id": "KB078",
+        "evento": "R-2060",
+        "codigo_erro": "ERF021",
+        "titulo": "R-2060 rejeitado — CNAE inválido para CPRB ou base de cálculo da desoneração inconsistente",
+        "descricao": "Evento R-2060 (Contribuição Previdenciária sobre a Receita Bruta — CPRB/Desoneração da Folha) rejeitado com ERF021. O CNAE informado não está na lista de atividades beneficiadas pela desoneração da folha ou a base de cálculo da CPRB está inconsistente com a receita bruta declarada.",
+        "causa_raiz": "O R-2060 é exclusivo de empresas optantes pela CPRB (Lei 12.546/2011 — desoneração da folha). O ERF021 ocorre por: o CNAE principal não está entre os beneficiados pela desoneração nas leis 12.546/2011, 13.161/2015 e alterações; alíquota CPRB incorreta — setores têxtil/TI usam 2,5%, construção civil/transporte coletivo usam 4,5%, outros entre 1% e 4,5%; dedução indevida de exportações (limite de 60% da receita); ou o campo indDesoneracao indica desoneração mas a empresa optou por não aderir no início do ano.",
+        "passos_resolucao": [
+            "Consultar a tabela de CNAEs beneficiados pela CPRB vigente no período (a lista mudou ao longo dos anos — verificar a legislação do perApur específico)",
+            "Verificar a alíquota correta para o CNAE: consultar o Anexo I e II da Lei 12.546/2011 e alterações posteriores",
+            "Calcular a base de cálculo: receita bruta total − exportações (limitado a 60% da receita) − receitas financeiras tributadas − vendas canceladas e descontos incondicionais",
+            "Verificar se a empresa fez a opção pela CPRB no início do ano calendário (a opção é irretratável para o ano)",
+            "Corrigir os campos vlrRecBrutaTotal, vlrRecBrutaExcl, vlrContrib e retransmitir"
+        ],
+        "validacao": "R-2060 aceito. Confirmar que o DARF CPRB (código 2985 ou 2991 conforme CNAE) foi gerado com valor consistente com o DCTFWeb.",
+        "tempo_estimado": "2-4h (requer análise do faturamento e consulta à legislação)",
+        "impacto": "alto",
+        "tags": ["R-2060", "ERF021", "EFD-Reinf", "CPRB", "desoneração folha", "CNAE", "receita bruta", "Lei 12546", "contribuição previdenciária"]
+    },
+
+    # ── R-2098 — REABERTURA DE PERÍODO (KB079) ──────────────────────────────────
+    {
+        "id": "KB079",
+        "evento": "R-2098",
+        "codigo_erro": "ERF030",
+        "titulo": "R-2098 rejeitado — período não encerrado ou ausência de R-2099 anterior para reabertura",
+        "descricao": "Evento R-2098 (Reabertura dos Eventos Periódicos) rejeitado com ERF030. Tentativa de reabrir período que não foi encerrado com R-2099, ou o período a ser reaberto não permite reabertura por já estar fechado definitivamente pelo DCTFWeb.",
+        "causa_raiz": "O R-2098 só pode ser enviado após o período ter sido encerrado com R-2099. O ERF030 ocorre por: envio de R-2098 para período que nunca recebeu R-2099 (não há o que reabrir); tentativa de reabrir período cujo prazo de retificação já expirou (normalmente 5 anos); ou o DCTFWeb do período já está homologado e o sistema RFB não permite mais retificações pela EFD-Reinf.",
+        "passos_resolucao": [
+            "Verificar no histórico da EFD-Reinf se o R-2099 foi enviado e aceito para o período que deseja reabrir",
+            "Confirmar se o período ainda está dentro do prazo de retificação (5 anos da data de entrega original)",
+            "Verificar no DCTFWeb se a declaração do período já foi homologada — períodos com DCTFWeb homologado requerem processo administrativo para retificação",
+            "Se o R-2098 for válido, garantir que o nrRecFec referencia o nrRec do R-2099 de encerramento correto",
+            "Após aceite do R-2098, enviar os eventos corrigidos e finalizar novamente com R-2099"
+        ],
+        "validacao": "R-2098 aceito. O status do período volta para 'aberto' no portal EFD-Reinf, permitindo novos eventos da série R-2xxx.",
+        "tempo_estimado": "30min-1h",
+        "impacto": "médio",
+        "tags": ["R-2098", "ERF030", "EFD-Reinf", "reabertura período", "R-2099", "retificação", "DCTFWeb", "período encerrado"]
+    },
+
+    # ── R-2099 — ENCERRAMENTO DE PERÍODO (KB080) ───────────────────────────────
+    {
+        "id": "KB080",
+        "evento": "R-2099",
+        "codigo_erro": "ERF031",
+        "titulo": "R-2099 rejeitado — eventos da série R-2xxx pendentes ou inconsistência no totalizador",
+        "descricao": "Evento R-2099 (Fechamento dos Eventos Periódicos) rejeitado com ERF031. Existem eventos da série R-2xxx com erros de processamento pendentes no período, ou o totalizador de retenções calculado pelo R-2099 diverge do somatório dos eventos R-2010/R-2020/R-2050/R-2060 aceitos.",
+        "causa_raiz": "O R-2099 só é aceito quando todos os eventos do período estão com status 'aceito' e o somatório bate. O ERF031 ocorre por: existência de R-2010/R-2020/R-2050/R-2060 com status 'em processamento' ou 'rejeitado' no período; valores totais informados no R-2099 (totVlrCsll, totVlrCofins, totVlrPis, totVlrRetPR, totVlrCprb) divergem do somatório dos eventos aceitos; ou o R-2099 foi enviado antes do processamento de todos os eventos do lote.",
+        "passos_resolucao": [
+            "Consultar o portal EFD-Reinf para verificar o status de cada evento do período — filtrar por 'rejeitado' e 'em processamento'",
+            "Corrigir e retransmitir todos os eventos rejeitados do período antes de tentar fechar com R-2099",
+            "Recalcular os totalizadores do R-2099: totVlrCsll = Σ vlrCsll dos R-2010 aceitos; repetir para COFINS, PIS e CPRB",
+            "Aguardar o processamento completo do lote (pode levar até 1h em picos) antes de enviar o R-2099",
+            "Se os valores do R-2099 estiverem corretos mas ainda houver rejeição, abrir chamado na Central Virtual de Atendimento (CVA) da RFB"
+        ],
+        "validacao": "R-2099 aceito. O período fica com status 'encerrado' no portal EFD-Reinf e o DCTFWeb é alimentado automaticamente com os valores totalizados.",
+        "tempo_estimado": "1-3h (dependendo do número de eventos pendentes)",
+        "impacto": "crítico",
+        "tags": ["R-2099", "ERF031", "EFD-Reinf", "encerramento período", "totalizador", "DCTFWeb", "fechamento", "R-2010", "R-2020"]
+    },
+
+    # ── R-4010 — PAGAMENTOS RENDIMENTOS PF (KB081) ─────────────────────────────
+    {
+        "id": "KB081",
+        "evento": "R-4010",
+        "codigo_erro": "ERF040",
+        "titulo": "R-4010 rejeitado — CPF do beneficiário inválido ou IRRF calculado incorretamente",
+        "descricao": "Evento R-4010 (Pagamentos/Créditos a Beneficiários Pessoa Física) rejeitado com ERF040. O CPF do beneficiário (cpfBenef) está inativo, com pendências ou é inválido, ou o IRRF calculado não corresponde à tabela progressiva do IRPF aplicada sobre o rendimento tributável.",
+        "causa_raiz": "O R-4010 registra pagamentos de rendimentos sujeitos ao IRRF para pessoas físicas (honorários, aluguéis, trabalho sem vínculo, etc.). O ERF040 ocorre por: CPF inativo, suspenso ou não inscrito na RFB; IRRF calculado com alíquota desatualizada (a tabela progressiva é atualizada periodicamente); dedução de dependentes não comprovada pelo funcionário via formulário; natureza do rendimento (natRend) incompatível com o tipo de pagamento — por exemplo, usar código de salário para honorários de autônomo; ou ausência de desconto da contribuição ao INSS quando o beneficiário é contribuinte individual.",
+        "passos_resolucao": [
+            "Validar o CPF do beneficiário na RFB — se inativo, orientar o beneficiário a regularizar sua situação cadastral antes do próximo pagamento",
+            "Aplicar a tabela progressiva vigente para o mês do pagamento: consultar a tabela IRPF no portal RFB para o ano-calendário correto",
+            "Verificar as deduções permitidas: dependentes (valor fixo por dependente conforme tabela), pensão alimentícia judicial, contribuição previdenciária (INSS do mês)",
+            "Confirmar a natRend correta: 13001=aluguéis PF, 12001=trabalho sem vínculo, 14001=honorários advocatícios, 20001=royalties — cada natureza tem regras específicas de alíquota",
+            "Para autônomos: verificar se há retenção de ISS municipal além do IRRF e INSS, e se os três estão sendo informados corretamente",
+            "Retransmitir R-4010 corrigido"
+        ],
+        "validacao": "R-4010 aceito. Verificar que o DARF IRRF (código 0588 para trabalho sem vínculo, 3208 para aluguéis) foi gerado com valor correto.",
+        "tempo_estimado": "1-2h",
+        "impacto": "alto",
+        "tags": ["R-4010", "ERF040", "EFD-Reinf", "IRRF", "pessoa física", "CPF beneficiário", "tabela progressiva", "natRend", "rendimentos", "IR retido na fonte"]
+    },
+
+    # ── R-4020 — PAGAMENTOS RENDIMENTOS PJ (KB082) ─────────────────────────────
+    {
+        "id": "KB082",
+        "evento": "R-4020",
+        "codigo_erro": "ERF041",
+        "titulo": "R-4020 rejeitado — CNPJ do beneficiário PJ inválido ou IRRF/CSLL/COFINS/PIS inconsistentes",
+        "descricao": "Evento R-4020 (Pagamentos/Créditos a Beneficiários Pessoa Jurídica) rejeitado com ERF041. O CNPJ do beneficiário (cnpjBenef) está inativo ou os valores de IRRF, CSLL, COFINS e PIS retidos não correspondem às alíquotas legais para a natureza do serviço contratado.",
+        "causa_raiz": "O R-4020 cobre pagamentos a PJ sujeitos a múltiplas retenções. O ERF041 ocorre por: CNPJ do beneficiário inativo ou inapto; aplicação incorreta das alíquotas — para serviços gerais: IRRF 1,5% (ou alíquota da tabela progressiva), CSLL 1%, COFINS 3%, PIS 0,65%; para serviços de assessoria e consultoria: IRRF pode ser 1,5%; confusão entre R-4020 (pagamento) e R-2010 (retenção na fonte de serviços tomados — são eventos distintos com finalidades diferentes); ou natRend incompatível com o CNPJ do beneficiário (ex: informar serviços de limpeza para empresa de software).",
+        "passos_resolucao": [
+            "Confirmar o CNPJ do beneficiário na RFB e verificar o CNAE principal para validar a natRend",
+            "Verificar a tabela de alíquotas de IRRF por natRend — código 11301 (TI/software) tem IRRF 1,5%, código 10308 (limpeza) tem IRRF 1%",
+            "Somar as retenções: IRRF + CSLL 1% + COFINS 3% + PIS 0,65% — verificar se a empresa beneficiária é optante pelo Simples Nacional (isenta de CSLL/COFINS/PIS retidos)",
+            "Verificar se o pagamento não deveria ser informado no R-2010 (se é retenção de serviços tomados) em vez do R-4020 — os dois eventos têm sobreposição e devem ser usados de acordo com a instrução normativa",
+            "Retransmitir com valores corretos"
+        ],
+        "validacao": "R-4020 aceito. Verificar os DARFs gerados: IRRF código 1708 (serviços), CSLL 5952, COFINS 5960, PIS 5979.",
+        "tempo_estimado": "1-3h",
+        "impacto": "alto",
+        "tags": ["R-4020", "ERF041", "EFD-Reinf", "IRRF", "pessoa jurídica", "CNPJ beneficiário", "CSLL", "COFINS", "PIS", "retenções PJ"]
+    },
+
+    # ── R-4040 — PAGAMENTOS NÃO IDENTIFICADOS (KB083) ──────────────────────────
+    {
+        "id": "KB083",
+        "evento": "R-4040",
+        "codigo_erro": "ERF042",
+        "titulo": "R-4040 rejeitado — pagamento identificado não pode ser informado como beneficiário não identificado",
+        "descricao": "Evento R-4040 (Pagamentos/Créditos a Beneficiários Não Identificados) rejeitado com ERF042. O sistema detectou que o beneficiário do pagamento pode ser identificado (CPF ou CNPJ rastreável pelas notas fiscais ou contratos), tornando indevido o uso do R-4040 em vez do R-4010 ou R-4020.",
+        "causa_raiz": "O R-4040 é reservado para casos excepcionais onde é impossível identificar o beneficiário (ex: vale-compras genérico, prêmios em dinheiro sem identificação, pagamentos por ordem de terceiros não rastreáveis). O ERF042 ocorre por: tentativa de usar R-4040 para pagamentos que têm nota fiscal com CPF/CNPJ do beneficiário; uso indevido para cobrir erros de cadastro de fornecedores; ou pagamentos de aluguéis, honorários ou serviços para os quais a identificação é obrigatória.",
+        "passos_resolucao": [
+            "Revisar o tipo de pagamento: se houver NF com CPF/CNPJ ou contrato identificado, usar R-4010 (PF) ou R-4020 (PJ)",
+            "O R-4040 é válido apenas para: prêmios a portador, reembolsos de pequenas despesas sem NF (dentro dos limites), pagamentos via cartão sem identificação do recebedor final",
+            "Para cada pagamento no R-4040, documentar o motivo da impossibilidade de identificação no processo interno",
+            "Migrar os pagamentos identificáveis para R-4010 ou R-4020 e retransmitir"
+        ],
+        "validacao": "R-4040 aceito apenas para os pagamentos genuinamente não identificáveis. Volume elevado de R-4040 pode gerar malha fiscal.",
+        "tempo_estimado": "1-2h",
+        "impacto": "médio",
+        "tags": ["R-4040", "ERF042", "EFD-Reinf", "beneficiário não identificado", "pagamentos", "IRRF", "malha fiscal"]
+    },
+
+    # ── R-4080 — RETENÇÃO SERVIÇOS TOMADOS — REGIME ESPECÍFICO (KB084) ─────────
+    {
+        "id": "KB084",
+        "evento": "R-4080",
+        "codigo_erro": "ERF043",
+        "titulo": "R-4080 rejeitado — retenção de 3,5% sobre serviços com cessão de mão de obra informada incorretamente",
+        "descricao": "Evento R-4080 (Retenção na Fonte sobre Pagamentos de Serviços Tomados — Substituição Tributária IRPJ/CSLL/COFINS/PIS) rejeitado com ERF043. A alíquota de retenção de 3,5% aplicada a serviços com cessão/locação de mão de obra está sendo informada incorretamente ou o CNPJ do prestador não está na lista de atividades sujeitas a esse regime.",
+        "causa_raiz": "O R-4080 cobre a retenção de 3,5% sobre prestação de serviços com cessão de mão de obra (Lei 10.833/2003, art. 31). O ERF043 ocorre por: serviço não está na lista de atividades sujeitas à retenção de 3,5% (vigilância, limpeza, TI, construção civil, etc.); valor da retenção não corresponde a 3,5% do valor bruto do serviço; confusão com R-2010 (que cobre retenção de 4,65%); prestador optante pelo Simples Nacional está incorretamente sujeito à retenção de 3,5% (Simples tem regime diferenciado).",
+        "passos_resolucao": [
+            "Confirmar que o serviço consta na lista do art. 31 da Lei 10.833/2003: vigilância, conservação/limpeza, TI, construção civil, assessoria de crédito, medicina do trabalho, etc.",
+            "Calcular: vlrRetencao = vlrBruto × 3,5%",
+            "Verificar se o prestador é Simples Nacional — se sim, a retenção de 3,5% não se aplica (usar R-2010 com alíquota zero ou não reter)",
+            "Distinguir do R-2010: o R-4080 aplica 3,5% (IRRF+CSLL+COFINS+PIS combinados); o R-2010 aplica 4,65% (separado por tributo). Usar o R-4080 quando o contrato é de cessão/locação de mão de obra",
+            "Retransmitir com valores corrigidos"
+        ],
+        "validacao": "R-4080 aceito. DARF único com código 6147 (retenção de 3,5% sobre serviços de cessão de mão de obra).",
+        "tempo_estimado": "1-2h",
+        "impacto": "médio",
+        "tags": ["R-4080", "ERF043", "EFD-Reinf", "cessão mão de obra", "retenção 3,5%", "Lei 10833", "substituição tributária", "Simples Nacional"]
+    },
+
+    # ── R-4099 — FECHAMENTO EVENTOS DA SÉRIE R-4000 (KB085) ────────────────────
+    {
+        "id": "KB085",
+        "evento": "R-4099",
+        "codigo_erro": "ERF044",
+        "titulo": "R-4099 rejeitado — eventos da série R-4xxx com pendências ou totalizador divergente",
+        "descricao": "Evento R-4099 (Fechamento dos Eventos da Série R-4000) rejeitado com ERF044. Há eventos R-4010/R-4020/R-4040/R-4080 com status 'rejeitado' ou 'em processamento' no período, ou o totalizador de IRRF e demais retenções no R-4099 diverge do somatório dos eventos aceitos.",
+        "causa_raiz": "O R-4099 encerra o período para os eventos de pagamentos (série R-4xxx). O ERF044 ocorre pelos mesmos motivos do R-2099: eventos pendentes no período; divergência nos totalizadores (totIRRF, totCSLL, totCOFINS, totPIS); ou envio prematuro antes do processamento completo do lote.",
+        "passos_resolucao": [
+            "Consultar o portal EFD-Reinf para listar eventos R-4010/R-4020/R-4040/R-4080 com status diferente de 'aceito' no período",
+            "Corrigir e retransmitir todos os eventos rejeitados",
+            "Recalcular: totIRRF = Σ vlrIRRF de todos R-4010/R-4020/R-4040/R-4080 aceitos no período",
+            "Aguardar processamento completo e retransmitir R-4099"
+        ],
+        "validacao": "R-4099 aceito. DCTFWeb alimentado com os valores da série R-4xxx. Verificar o DARF consolidado gerado.",
+        "tempo_estimado": "1-2h",
+        "impacto": "crítico",
+        "tags": ["R-4099", "ERF044", "EFD-Reinf", "fechamento R-4000", "IRRF", "totalizador", "DCTFWeb", "encerramento período"]
+    },
+
+    # ── R-9001 — PROCESSAMENTO COM ADVERTÊNCIA (KB086) ─────────────────────────
+    {
+        "id": "KB086",
+        "evento": "R-9001",
+        "codigo_erro": "ERF050",
+        "titulo": "R-9001 — evento aceito com advertências que devem ser analisadas antes do fechamento",
+        "descricao": "O evento recebeu o R-9001 (Resultado do Processamento — Advertências) indicando que foi aceito mas com inconsistências não impeditivas. As advertências devem ser analisadas pois podem indicar erros que impactam o cálculo correto das retenções e a malha fiscal futura.",
+        "causa_raiz": "O R-9001 é gerado pela RFB quando o evento é aceito mas apresenta divergências que não impedem o processamento mas que podem gerar inconsistências: valor da retenção inferior ao mínimo esperado para a natRend (possível sub-retenção); CNPJ/CPF do beneficiário com pendências cadastrais menores (nome divergente, endereço desatualizado); período de competência incomum para o tipo de rendimento; ou cruzamento com dados de DIRF/DCTF que apresenta divergência.",
+        "passos_resolucao": [
+            "Ler o campo descWarn do R-9001 para identificar a natureza da advertência",
+            "Para cada advertência: avaliar se é um erro real (requer retificação) ou uma falsa indicação (documentar o motivo e manter o valor)",
+            "Advertências de sub-retenção: recalcular o IRRF/CSLL/COFINS/PIS para confirmar se o valor está correto",
+            "Advertências de cadastro: solicitar ao beneficiário a atualização de dados na RFB",
+            "Se necessário retificar: enviar o evento corrigido com indRetif=2 antes de fechar o período com R-2099 ou R-4099",
+            "Documentar as advertências não corrigidas com justificativa técnica para eventual auditoria"
+        ],
+        "validacao": "Após análise de todas as advertências: ou o evento está correto e o R-9001 é arquivado com justificativa, ou o evento foi retificado e o novo processamento não gerou R-9001.",
+        "tempo_estimado": "30min-2h por advertência",
+        "impacto": "médio",
+        "tags": ["R-9001", "ERF050", "EFD-Reinf", "advertência", "processamento", "malha fiscal", "sub-retenção", "retificação", "DIRF"]
+    },
+
+    # ── R-2010 DUPLICIDADE — NOTA FISCAL JÁ ESCRITURADA (KB087) ────────────────
+    {
+        "id": "KB087",
+        "evento": "R-2010",
+        "codigo_erro": "ERF012",
+        "titulo": "R-2010 rejeitado — nota fiscal já escriturada em período anterior (duplicidade ERF012)",
+        "descricao": "Evento R-2010 rejeitado com ERF012 indicando que a nota fiscal (identificada pela combinação nrNF + serie + cnpjPrestador + dtFatamento) já foi escriturada em um período de apuração anterior.",
+        "causa_raiz": "O ERF012 ocorre quando a mesma NF é transmitida em dois períodos diferentes. Causas comuns: o sistema ERP escritura a NF no mês de recebimento em vez do mês de faturamento (competência); retransmissão de mês anterior por erro sem usar o modo retificador; processo de virada de mês que reprocessa NFs pagas no início do mês seguinte.",
+        "passos_resolucao": [
+            "Identificar em qual período a NF foi escriturada originalmente — consultar o portal EFD-Reinf ou o histórico do ERP",
+            "Se a escrituração anterior está correta: cancelar o R-2010 duplicado (não retransmitir)",
+            "Se a escrituração anterior está incorreta: abrir o período anterior com R-2098, enviar R-2010 retificador com indRetif=2 referenciando o nrRec original, fechar com R-2099",
+            "Corrigir a regra de competência no ERP: a NF deve ser escriturada no período (mês/ano) da data de faturamento (dtFatamento), não da data de pagamento"
+        ],
+        "validacao": "Ausência de ERF012 no reprocessamento. Confirmar que cada NF aparece em apenas um período no histórico EFD-Reinf.",
+        "tempo_estimado": "1-2h",
+        "impacto": "médio",
+        "tags": ["R-2010", "ERF012", "EFD-Reinf", "duplicidade", "nota fiscal", "competência", "retenção fonte", "retificação"]
+    },
+
+    # ── R-4010 TABELA PROGRESSIVA — APLICAÇÃO INCORRETA (KB088) ────────────────
+    {
+        "id": "KB088",
+        "evento": "R-4010",
+        "codigo_erro": "ERF045",
+        "titulo": "R-4010 rejeitado — IRRF calculado com tabela progressiva desatualizada (ERF045)",
+        "descricao": "Evento R-4010 rejeitado com ERF045 porque o IRRF calculado não corresponde à tabela progressiva vigente para o mês de competência. O sistema da RFB calcula o IRRF esperado e compara com o valor informado.",
+        "causa_raiz": "A tabela progressiva do IRPF é atualizada por lei (ex: Lei 14.663/2023 atualizou as faixas em 2024). O ERF045 ocorre quando: o ERP usa tabela desatualizada (ex: tabela de 2022 aplicada em 2024); a dedução por dependente usa valor fixo desatualizado; a contribuição ao INSS usada como dedução está incorreta; ou o rendimento tributável não exclui as parcelas isentas (PLR até o limite, auxílios isentos, etc.).",
+        "passos_resolucao": [
+            "Consultar a tabela progressiva vigente para o período no portal RFB — verificar faixas e alíquotas exatas",
+            "Base tributável = rendimento bruto − INSS retido − dedução por dependente (valor fixo mensal por dependente) − pensão alimentícia judicial",
+            "Aplicar a alíquota correspondente à faixa e subtrair a parcela a deduzir da tabela",
+            "Verificar se há rendimentos isentos sendo incluídos na base (ex: PLR até R$ 7.000/ano em 2024 é isento)",
+            "Atualizar a tabela progressiva no ERP e retransmitir"
+        ],
+        "validacao": "R-4010 aceito sem ERF045. Verificar que o Informe de Rendimentos emitido ao beneficiário é consistente com os valores transmitidos.",
+        "tempo_estimado": "1-2h",
+        "impacto": "alto",
+        "tags": ["R-4010", "ERF045", "EFD-Reinf", "tabela progressiva", "IRRF", "IRPF", "dedução dependente", "rendimento tributável", "Lei 14663"]
+    },
+
+    # ── R-1000 ALTERAÇÃO CADASTRAL (KB089) ─────────────────────────────────────
+    {
+        "id": "KB089",
+        "evento": "R-1000",
+        "codigo_erro": "ERF002",
+        "titulo": "R-1000 rejeitado — alteração cadastral enviada sem encerrar período aberto (ERF002)",
+        "descricao": "Evento R-1000 com indEvtAdic=A (alteração) ou indEvtAdic=E (exclusão) rejeitado com ERF002 porque há período de apuração em aberto na EFD-Reinf que deve ser encerrado antes de qualquer alteração nos dados cadastrais do contribuinte.",
+        "causa_raiz": "O R-1000 de alteração só é aceito quando não há período aberto. O ERF002 ocorre por: tentativa de alterar classTrib ou indApuracao no meio do ano sem encerrar os períodos pendentes; mudança de regime tributário (ex: Simples Nacional para Lucro Presumido) que exige encerramento do período anterior; ou envio de R-1000 de encerramento (indEvtAdic=E) com períodos ainda em aberto.",
+        "passos_resolucao": [
+            "Verificar no portal EFD-Reinf quais períodos estão em aberto",
+            "Fechar todos os períodos abertos enviando R-2099 e R-4099 para cada período pendente",
+            "Após encerramento de todos os períodos, enviar o R-1000 de alteração ou encerramento",
+            "Se a mudança de regime tributário ocorreu no meio do ano: contabilizar o período de transição corretamente e documentar no processo"
+        ],
+        "validacao": "R-1000 de alteração aceito. Verificar que os períodos subsequentes usam os novos dados cadastrais.",
+        "tempo_estimado": "2-4h (depende do número de períodos em aberto)",
+        "impacto": "alto",
+        "tags": ["R-1000", "ERF002", "EFD-Reinf", "alteração cadastral", "regime tributário", "classTrib", "período aberto", "encerramento"]
+    },
+
+    # ── R-2010 SIMPLES NACIONAL — RETENÇÃO INDEVIDA (KB090) ────────────────────
+    {
+        "id": "KB090",
+        "evento": "R-2010",
+        "codigo_erro": "ERF013",
+        "titulo": "R-2010 rejeitado — retenção de CSLL/COFINS/PIS sobre prestador optante pelo Simples Nacional (ERF013)",
+        "descricao": "Evento R-2010 rejeitado com ERF013 porque o CNPJ do prestador é optante pelo Simples Nacional, e o Simples Nacional tem regime de apuração unificado que substitui CSLL, COFINS e PIS — a retenção de 4,65% sobre prestadores Simples é vedada pela legislação.",
+        "causa_raiz": "O ERF013 é gerado quando a RFB cruza o CNPJ do prestador com o cadastro do Simples Nacional e identifica a retenção como indevida. O ERP aplica automaticamente a retenção de 4,65% para todos os prestadores sem verificar o regime tributário, gerando retenções indevidas sobre prestadores Simples.",
+        "passos_resolucao": [
+            "Verificar o regime tributário do prestador no portal do Simples Nacional (PGMEI ou portal Simples)",
+            "Prestadores Simples Nacional estão isentos da retenção de CSLL/COFINS/PIS — a retenção de IRRF (1,5% ou tabela) pode ainda ser aplicável dependendo da atividade",
+            "Configurar o ERP para verificar o regime tributário do fornecedor antes de calcular retenções — usar a API de consulta do Simples Nacional da RFB",
+            "Cancelar o R-2010 indevido (não retransmitir) e, se o valor já foi retido, iniciar processo de devolução ao prestador",
+            "Atualizar o cadastro do fornecedor no ERP com flag 'Simples Nacional = Sim' para evitar retenção futura"
+        ],
+        "validacao": "Ausência de ERF013. Fornecedores Simples Nacional escriturados corretamente com vlrCsll=0, vlrCofins=0, vlrPis=0.",
+        "tempo_estimado": "1-3h (pode envolver devolução de valores ao prestador)",
+        "impacto": "médio",
+        "tags": ["R-2010", "ERF013", "EFD-Reinf", "Simples Nacional", "retenção indevida", "CSLL", "COFINS", "PIS", "regime tributário fornecedor"]
+    },
+
+    # ── R-4010 ALUGUÉIS — BASE DE CÁLCULO INCORRETA (KB091) ───────────────────
+    {
+        "id": "KB091",
+        "evento": "R-4010",
+        "codigo_erro": "ERF046",
+        "titulo": "R-4010 rejeitado — IRRF sobre aluguéis calculado sobre valor bruto incluindo despesas dedutíveis (ERF046)",
+        "descricao": "Evento R-4010 rejeitado com ERF046 para pagamentos de aluguel (natRend=13001 ou 13003). O IRRF foi calculado sobre o valor bruto do aluguel sem deduzir as despesas que o locatário paga e que legalmente devem ser excluídas da base de cálculo do IRRF.",
+        "causa_raiz": "Para aluguéis de imóveis, a base do IRRF é o valor efetivamente pago ao locador, descontadas as despesas que o locatário assume (IPTU, condomínio, reparos por conta do locatário). O ERF046 ocorre quando o ERP calcula o IRRF sobre o valor bruto do contrato sem aplicar as deduções legais previstas na Instrução Normativa RFB 1.500/2014.",
+        "passos_resolucao": [
+            "Identificar as despesas do imóvel pagas pelo locatário: IPTU, condomínio, seguros obrigatórios — essas são dedutíveis da base do IRRF",
+            "Base do IRRF = valor do aluguel − IPTU pago pelo locatário − condomínio pago pelo locatário",
+            "Aplicar a tabela progressiva do IRPF sobre a base reduzida",
+            "Verificar se o locador pessoa física tem dependentes registrados que geram dedução adicional",
+            "Retransmitir R-4010 com vlrRendTrib corrigido (base deduzida) e vlrIRRF recalculado"
+        ],
+        "validacao": "R-4010 aceito. Informe de Rendimentos do locador reflete o valor correto (bruto e dedutível separados).",
+        "tempo_estimado": "1h",
+        "impacto": "médio",
+        "tags": ["R-4010", "ERF046", "EFD-Reinf", "aluguel", "IRRF", "base cálculo", "IPTU", "condomínio", "deduções locatário", "natRend 13001"]
+    },
+
+    # ── R-2060 EXCLUSÃO RECEITA EXPORTAÇÃO (KB092) ─────────────────────────────
+    {
+        "id": "KB092",
+        "evento": "R-2060",
+        "codigo_erro": "ERF022",
+        "titulo": "R-2060 rejeitado — dedução de receita de exportação superior ao limite de 60% da receita bruta total (ERF022)",
+        "descricao": "Evento R-2060 (CPRB) rejeitado com ERF022. O campo vlrRecBrutaExcl (receitas de exportação excluídas da base CPRB) é superior a 60% do vlrRecBrutaTotal, violando o limite legal para a dedução de exportações na base de cálculo da CPRB.",
+        "causa_raiz": "A Lei 12.546/2011 permite excluir receitas de exportação da base da CPRB, mas limita essa exclusão a 60% da receita bruta total. O ERF022 ocorre quando o ERP exclui 100% das receitas de exportação sem aplicar o limite de 60%, resultando em base de cálculo menor que o legalmente permitido e recolhimento insuficiente da CPRB.",
+        "passos_resolucao": [
+            "Calcular o limite de exportação: max_excl = vlrRecBrutaTotal × 60%",
+            "Se vlrRecBrutaExcl > max_excl: reduzir vlrRecBrutaExcl para o valor de max_excl",
+            "Recalcular: base_cprb = vlrRecBrutaTotal − vlrRecBrutaExcl (após aplicar limite) − outras exclusões legais",
+            "Recalcular vlrContrib = base_cprb × alíquota CPRB",
+            "Retransmitir R-2060 corrigido e gerar novo DARF para recolhimento da diferença"
+        ],
+        "validacao": "R-2060 aceito. Verificar que vlrRecBrutaExcl ≤ vlrRecBrutaTotal × 60% no registro aceito.",
+        "tempo_estimado": "1-2h",
+        "impacto": "alto",
+        "tags": ["R-2060", "ERF022", "EFD-Reinf", "CPRB", "exportação", "limite 60%", "base cálculo", "desoneração folha", "receita bruta"]
+    },
+
+    # ── R-4020 SIMPLES NACIONAL — IRRF SOBRE SERVIÇOS (KB093) ──────────────────
+    {
+        "id": "KB093",
+        "evento": "R-4020",
+        "codigo_erro": "ERF047",
+        "titulo": "R-4020 rejeitado — IRRF retido sobre PJ Simples Nacional para atividade não sujeita à retenção (ERF047)",
+        "descricao": "Evento R-4020 rejeitado com ERF047. Foi informada retenção de IRRF sobre pagamento a pessoa jurídica optante pelo Simples Nacional para atividade que não está sujeita à retenção na fonte de IRPJ (art. 64 da Lei 9.430/1996 e IN RFB 1.234/2012).",
+        "causa_raiz": "O ERF047 ocorre quando o ERP retém IRRF sobre serviços prestados por empresa Simples Nacional para atividades cujo IRRF na fonte é vedado para esse regime. O Simples Nacional tem recolhimento unificado do IRPJ pelo DAS, e a retenção na fonte sobre essas empresas gera dupla tributação. Apenas serviços de construção civil, limpeza e vigilância têm retenção obrigatória mesmo para Simples (art. 31, Lei 10.833/2003).",
+        "passos_resolucao": [
+            "Verificar se o prestador é Simples Nacional: consultar o portal do Simples Nacional ou solicitar declaração do prestador",
+            "Verificar o tipo de serviço: construção civil, limpeza, vigilância → retenção obrigatória mesmo no Simples; outros serviços → retenção vedada",
+            "Para serviços não sujeitos à retenção: cancelar o R-4020 com IRRF e registrar o pagamento sem retenção (vlrIRRF=0)",
+            "Devolver ao prestador o valor retido indevidamente e documentar a devolução",
+            "Atualizar o cadastro de fornecedores no ERP com flag de regime tributário para evitar reincidência"
+        ],
+        "validacao": "Ausência de ERF047. Pagamentos a Simples Nacional para serviços não sujeitos transmitidos com vlrIRRF=0.",
+        "tempo_estimado": "1-3h",
+        "impacto": "médio",
+        "tags": ["R-4020", "ERF047", "EFD-Reinf", "Simples Nacional", "IRRF indevido", "retenção fonte PJ", "DAS", "Lei 10833", "serviços PJ"]
+    },
 ]

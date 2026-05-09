@@ -5,7 +5,61 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased]
+## [Unreleased] — Fase 5
+
+### Added (Fase 5 — v3.0 em progresso)
+
+- **feat(notifier): alertas HITL por e-mail** (2026-05-09)
+  - `notifier.py` novo — stdlib pura, zero dependencias novas (smtplib + email.mime)
+  - Config via keyring: `EII_SMTP_HOST`, `EII_SMTP_PORT`, `EII_SMTP_USER`,
+    `EII_SMTP_PASS`, `EII_ALERT_EMAIL` (suporta multiplos destinatarios, virgula)
+  - Suporta TLS (porta 587, starttls) e SSL (porta 465, SMTP_SSL)
+  - `send_hitl_alert(incident)` envia em background thread — nao bloqueia pipeline
+  - E-mail HTML dark-mode com badge de severidade, causa raiz, passos e CTA para dashboard
+  - Sem config: log debug silencioso, pipeline continua normalmente (graceful fallback)
+  - Integrado em `eii_handlers.query_incident()` — dispara apos `_db_save_pending()`
+  - Import lazy com fallback: `eii_handlers` continua funcional mesmo sem `notifier.py`
+
+- **feat(kb): KB expandida — 93 incidentes com cobertura completa EFD-Reinf** (2026-05-09)
+  - `knowledge_base.py`: 20 novos incidentes EFD-Reinf adicionados (KB074-KB093)
+  - Eventos cobertos: R-1000 (contribuinte), R-2010/R-2020 (serviços tomados/prestados),
+    R-2050 (produção rural/FUNRURAL), R-2060 (CPRB/desoneração folha),
+    R-2098/R-2099 (reabertura/encerramento período), R-4010/R-4020/R-4040/R-4080/R-4099
+    (pagamentos PF/PJ/não identificados/cessão mão de obra), R-9001 (advertências)
+  - Erros documentados: ERF001-ERF050 (CNPJ inativo, retenção indevida Simples Nacional,
+    tabela progressiva desatualizada, limite exportação CPRB, duplicidade NF, etc.)
+  - Cada incidente com: causa_raiz detalhada, passos_resolucao step-by-step,
+    validacao, tempo_estimado, impacto e tags para busca semântica
+  - KB passa de 73 (apenas eSocial) para 93 incidentes (eSocial + EFD-Reinf)
+
+- **feat(admin): Dashboard de métricas no painel admin** (2026-05-09)
+  - `app.py`: `admin_get_metrics()` retorna `(kpi_md, fig_status, fig_trend)`
+  - KPIs: MTTR médio, taxa aprovação, taxa escalation, total incidentes, pendentes
+  - `fig_status`: gráfico horizontal bar APPROVED/REJECTED/PENDING (matplotlib)
+  - `fig_trend`: gráfico de linha dos últimos 30 dias de incidentes (matplotlib)
+  - Aba "Métricas" no painel admin substituindo "Estatísticas" — gr.Plot para figuras
+
+- **feat(observability): LangSmith traces completos — 1 span por agente** (2026-05-09)
+  - `observability.py`: deteccao de key unificada (`LANGSMITH_API_KEY` ou `LANGCHAIN_API_KEY`);
+    habilita `LANGCHAIN_TRACING_V2=true` automaticamente quando key presente
+  - `add_run_metadata(metadata)`: novo helper — enriquece o span ativo do LangGraph
+    com campos de negocio sem criar span filho duplicado; no-op gracioso quando
+    LangSmith nao configurado ou `get_current_run_tree()` indisponivel
+  - `router_node`: metadata — incident_id, evento, codigo_erro, severity, pii_detected, routing_decision
+  - `generate_node`: metadata — incident_id, routing_decision, confianca, severidade, fonte, kb_refs
+  - `evaluate_node`: metadata — eval_verdict, eval_score, eval_iteration, needs_refinement,
+    criteria_passed, criteria_failed
+  - `finalize_node`: metadata — confianca, severidade, logprob_sim, iteracoes, evaluation_score,
+    referencias_kb, has_hitl_alert
+  - `intel_node`: metadata — intel_risco_recorrencia, intel_total_90d, intel_tendencia,
+    intel_alertas_count, intel_relacionados_count
+  - `IntelAgent.run()`: delegado para `_run_impl()` via `@observability.traceable`
+    (span `EII.IntelAgent.run`) com fallback gracioso se observability falhar
+  - `api.py`: `_traced_diagnose()` wrapper com `@observability.traceable`
+    (span `EII.API.diagnose`) aplicado no startup — endpoints rastreados sem
+    alterar assinatura do handler FastAPI
+
+
 
 ### Added (Fase 4 — v2.3 em progresso)
 
@@ -31,11 +85,92 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Graph compilado e smoke-tested E2E: pipeline flui parse→router→retrieve→generate→evaluate→finalize
     com tratamento de erro gracioso em cada no
 
-### Planned (ainda pendente na Fase 4)
-- IntelAgent — agente de inteligencia proativa
-- Integracao com sistema ERP/HCM real via API
-- Tela de admin — gerenciamento de usuarios em `app.py`
-- Upload de arquivo XML (alem de paste direto)
+- **feat(intel-agent): IntelAgent — agente de inteligencia proativa** (2026-05-09)
+  - `src/intel_agent/intel_agent.py` — classe `IntelAgent` com:
+    - `analyze_patterns(evento, codigo_erro, history)`: consulta SQLite (90 dias),
+      calcula total de ocorrencias, taxa de aprovacao HITL, tempo medio de resolucao
+      em horas e tendencia (CRESCENTE/ESTAVEL/DECRESCENTE) comparando janelas de 30d
+    - `suggest_related(referencias_kb)`: tag-overlap com Knowledge Base, retorna
+      top-3 incidentes KB mais relacionados por tags em comum
+    - `build_alerts(patterns, evento, codigo_erro)`: gera alertas textuais proativos
+      baseados em thresholds (>= 5 ocorrencias, tendencia crescente, taxa HITL < 50%,
+      MTTR > 8h)
+    - `run(final_result)`: orquestra tudo, retorna `ProactiveInsights` com
+      `padrao_historico`, `incidentes_relacionados`, `alertas`, `risco_recorrencia`
+  - `src/intel_agent/__init__.py` — modulo exportavel
+  - `src/deep_agents/nodes/intel_node.py` — no LangGraph async que chama `IntelAgent.run()`
+    e adiciona `proactive_insights` ao `AgentState`; erros sao capturados sem quebrar o pipeline
+  - `src/deep_agents/state.py` — adicionado campo `proactive_insights: Optional[Dict]`
+  - `src/deep_agents/graph.py` — adicionado no `intel` pos-`finalize`; fluxo agora e
+    `finalize → intel → END` (antes era `finalize → END`)
+  - Sem chamadas a LLM — analise puramente deterministica e sincrona; zero latencia adicional
+    em pipelines sem historico
+
+- **feat(app): integrar IntelAgent na UI do app.py** (2026-05-09)
+  - `format_insights_md(insights)`: formata ProactiveInsights como markdown com tabela
+    de métricas, alertas destacados e lista de incidentes KB relacionados
+  - `_run_intel_agent(diagnosis)`: helper com graceful fallback (retorna `""` se
+    IntelAgent indisponível ou falhar)
+  - `INTEL_AGENT_AVAILABLE`: flag de disponibilidade com import lazy, igual ao padrão
+    dos outros módulos (Deep Agents, SmartRouter)
+  - `_diagnose_deep_agents`: agora retorna `tuple[str, str]` — extrai
+    `proactive_insights` do `AgentState` pós-`intel_node`; `proactive_insights: None`
+    adicionado ao `init_state`
+  - `_diagnose_internal`: agora retorna `tuple[str, str]`; chama `_run_intel_agent`
+    em todos os caminhos (Ollama, pipeline padrão, fallback Ollama)
+  - `diagnose_handler_secure`: agora retorna `tuple[str, str, str]`
+    (diagnosis_md, insights_md, error_msg)
+  - UI: `insights_output = gr.Markdown(visible=False)` adicionado abaixo do diagnóstico;
+    exibido automaticamente quando há insights, oculto quando vazio — mesmo padrão do
+    `error_output` via `.then()`
+
+- **feat(app): upload de arquivo XML via gr.File** (2026-05-09)
+  - `load_xml_file(file)`: lê arquivo XML do path temporário Gradio 5 (FileData Pydantic
+    ou dict); retorna `(conteúdo, nome_arquivo)`; compatível com ambos os formatos de
+    entrega do Gradio 5 (`file.path` / `file["path"]`)
+  - `gr.File(file_types=[".xml"])` adicionado acima do textbox XML no painel esquerdo
+  - `upload_status`: `gr.Markdown` que aparece com nome do arquivo após upload bem-sucedido
+  - Wiring: `.change()` → popula `xml_input`; `.then()` exibe status com nome do arquivo
+  - Textbox continua editável — upload e paste coexistem; usuário pode ajustar após carregar
+
+- **feat(app): painel administrativo** (2026-05-09)
+  - UI reestruturada com `gr.Tabs` — abas **Diagnóstico** e **Admin** na interface principal
+  - `_require_session(session_token)`: helper interno que valida sessão e retorna username
+  - `admin_get_sessions`: tabela markdown das sessões ativas em memória com
+    usuário, horário de login, última atividade, tempo até expirar e marcação
+    da sessão atual
+  - `admin_revoke_sessions`: remove todas as sessões exceto a atual; loga a ação
+  - `admin_get_stats`: query SQLite com totais por status, incidentes nos últimos
+    7 e 30 dias, MTTR médio em horas e último incidente registrado
+  - `admin_change_password`: valida nova senha (>=8 chars, confirmação), salva via
+    `keyring.set_password('EII_Project', 'EII_ADMIN_PASS', ...)` e atualiza
+    `ADMIN_PASSWORD_HASH` global em runtime — sem precisar reiniciar o servidor
+  - Aba Admin com 3 sub-abas: **Sessões Ativas** (atualizar + revogar),
+    **Estatísticas** (atualizar sob demanda), **Alterar Senha** (limpa campos após
+    alteração bem-sucedida via `.then()`)
+  - Todos os handlers validam sessão antes de qualquer operação
+
+- **feat(api): REST API FastAPI para integração ERP/HCM** (2026-05-09)
+  - `api.py` — FastAPI app v1.0.0 com documentacao automatica em `/docs` (Swagger)
+    e `/redoc`
+  - Autenticacao via header `X-API-Key` lido do keyring (`EII_API_KEY`) com fallback
+    para `os.environ`; retorna 401 se ausente/incorreto, 500 se nao configurado
+  - `GET /health` — sem auth; verifica DB SQLite e retorna timestamp UTC
+  - `POST /v1/diagnose` — recebe `{xml, erp_reference?}`; chama `eii_handlers.query_incident()`;
+    persiste como PENDING; devolve diagnostico completo + `erp_reference` espelhado
+    para correlacao no sistema ERP
+  - `GET /v1/incidents` — listagem paginada com filtro por status (PENDING/APPROVED/REJECTED);
+    paginacao via `?page=&page_size=` (max 100)
+  - `GET /v1/incidents/{incident_id}` — diagnostico completo + notas + decided_at
+  - `POST /v1/incidents/{incident_id}/approve` — HITL via API; aceita `{notes}`
+  - `POST /v1/incidents/{incident_id}/reject` — idem
+  - Wraps `eii_handlers.escalate_incident()` — compartilha mesmo SQLite do Gradio;
+    Gradio e API podem rodar em paralelo sem conflito (WAL mode)
+  - Rodar: `uvicorn api:app --host 0.0.0.0 --port 8000`
+  - `requirements.txt`: adicionado `fastapi>=0.111.0` e `uvicorn[standard]>=0.29.0`
+
+### Fase 4 CONCLUIDA (2026-05-09)
+Todos os itens planejados para a Fase 4 foram entregues nesta sessao.
 
 ### Planned (Fase 5 — v3.0)
 - Expansao da KB para 100+ incidentes documentados

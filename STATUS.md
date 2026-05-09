@@ -30,7 +30,9 @@
 | `batch_processor.py` | Funcionando | processamento paralelo |
 | `observability.py` | Parcial | LangSmith opcional |
 | `smartrouter_v2/` | Em desenvolvimento | nao integrado ainda |
-| `src/deep_agents/` | Funcionando | pipeline LangGraph 7 nos (Phase 4) |
+| `src/deep_agents/` | Funcionando | pipeline LangGraph 8 nos (Phase 4 + intel_node) |
+| `src/intel_agent/` | Funcionando | analise proativa pos-diagnostico (Phase 4) |
+| `api.py` | Funcionando | REST API FastAPI para integracao ERP/HCM |
 | `src/` | Em desenvolvimento | estrutura modular futura |
 
 ### Credenciais configuradas (Windows Credential Manager)
@@ -102,10 +104,17 @@
   - evaluate_node: crag_pipeline.evaluate_diagnosis() com guarda MAX_ITERATIONS
   - reflexion_node: crag_pipeline.reflect() -> corrective_hint para proxima iteracao
   - finalize_node: ADR-001 logprobs confidence gate + final_result estruturado
-- [ ] IntelAgent — agente de inteligencia para sugestao proativa
-- [ ] Integracao com sistema ERP/HCM real via API
-- [ ] Tela de admin — gerenciamento de usuarios e permissoes em `app.py`
-- [ ] Upload de arquivo XML — alem de paste direto
+- [x] IntelAgent — agente de inteligencia proativa em `src/intel_agent/`
+  - analyze_patterns: frequencia/taxa aprovacao/MTTR/tendencia via SQLite
+  - suggest_related: incidentes KB por sobreposicao de tags
+  - build_alerts: alertas automaticos por thresholds
+  - intel_node: no LangGraph pos-finalize, adiciona proactive_insights ao AgentState
+- [x] Integracao com sistema ERP/HCM real via API — REST API FastAPI em `api.py`
+  - GET /health, POST /v1/diagnose, GET /v1/incidents, GET /v1/incidents/{id}
+  - POST /v1/incidents/{id}/approve, POST /v1/incidents/{id}/reject
+  - Auth via X-API-Key (keyring EII_API_KEY)
+- [x] Tela de admin — painel admin em aba dedicada (Sessoes, Estatisticas, Alterar Senha)
+- [x] Upload de arquivo XML — gr.File + handler load_xml_file em app.py
 
 **Responsavel:** Edson + Claude
 **Dependencias:** SmartRouter v2 estavel, estrutura `src/` definida
@@ -114,13 +123,29 @@
 
 ### Fase 5 — Observability & Scale [PLANEJADO] `v3.0`
 
-- [ ] LangSmith traces completos — um span por agente
+- [x] LangSmith traces completos — um span por agente
+  - observability.py: suporte a LANGSMITH_API_KEY + LANGCHAIN_API_KEY, add_run_metadata()
+  - router/generate/evaluate/finalize/intel nodes: add_run_metadata com campos de negocio
+  - IntelAgent.run(): @traceable via observability (span EII.IntelAgent.run)
+  - api.py: _traced_diagnose com @traceable (span EII.API.diagnose)
 - [ ] RAGAS evaluation — faithfulness + relevancy por colecao KB
-- [ ] Dashboard de metricas — MTTR, taxa de resolucao automatica, escalation rate
-- [ ] KB expandida — 100+ incidentes, cobertura EFD-Reinf (R-xxxx)
+- [x] Dashboard de metricas — MTTR, taxa de resolucao automatica, escalation rate
+  - admin_get_metrics() retorna (kpi_md, fig_status, fig_trend) com matplotlib
+  - gr.Plot para gráficos de status (barra horizontal) e tendência (linha 30d)
+  - Aba "Métricas" no painel admin do app.py
+- [x] KB expandida — 93 incidentes (era 73), EFD-Reinf cobertura completa
+  - KB074-KB093: 20 incidentes EFD-Reinf adicionados
+  - Cobre: R-1000, R-2010, R-2020, R-2050, R-2060, R-2098, R-2099, R-4010, R-4020, R-4040, R-4080, R-4099, R-9001
+  - Erros ERF001-ERF050 documentados com causa_raiz, passos_resolucao, validacao
 - [ ] Suporte a EFD-Reinf — eventos R-2010, R-2020, R-4010, etc.
 - [ ] API REST — integracao com JIRA e ServiceNow
-- [ ] Notificacao por e-mail — alerta quando incidente aguarda HITL
+- [x] Notificacao por e-mail — alerta quando incidente aguarda HITL
+  - `notifier.py`: stdlib pura (smtplib + email.mime), sem nova dependencia
+  - Config: EII_SMTP_HOST/PORT/USER/PASS + EII_ALERT_EMAIL via keyring
+  - Envia em background thread (nao bloqueia pipeline)
+  - HTML com severidade, causa raiz, passos e link para o dashboard
+  - Suporta TLS (porta 587) e SSL (porta 465); multiplos destinatarios (virgula)
+  - Integrado em `eii_handlers.query_incident()` pos _db_save_pending
 - [ ] Multitenancy — isolar dados por empresa (para virar SaaS)
 
 **Dependencias:** Fase 4 concluida, validacao com empresa real
@@ -221,6 +246,6 @@ for k in ['GROQ_API_KEY','EII_ADMIN_USER','EII_ADMIN_PASS','QDRANT_API_KEY']:
 
 ---
 
-**Ultima atualizacao:** 2026-05-08 (Phase 4 nodes)
+**Ultima atualizacao:** 2026-05-09 (Fase 4 CONCLUIDA — IntelAgent + Upload XML + Admin + REST API)
 **Autor:** Edson Oliveira
 **Mantido por:** obrigatorio — qualquer mudanca no projeto atualiza este arquivo

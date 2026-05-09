@@ -1171,7 +1171,8 @@ with gr.Blocks(
                             value=False,
                         )
 
-                        with gr.Accordion("Opções avançadas", open=False, elem_classes=["advanced-opts"]):
+                        gr.Markdown("**Opções avançadas**", elem_classes=["advanced-opts"])
+                        with gr.Column(elem_classes=["advanced-opts"]):
                             force_local = gr.Checkbox(label="Forçar Ollama local (LGPD total)", value=False)
                             if SMARTROUTER_AVAILABLE:
                                 use_smartrouter = gr.Checkbox(

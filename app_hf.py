@@ -370,41 +370,48 @@ Cole o XML rejeitado pela plataforma e receba a causa raiz e os passos de resolu
         # ── Tab 1: Diagnostico ─────────────────────────────────────────────
         with gr.Tab("Diagnostico"):
 
+            # Exemplos — botoes nomeados no topo
+            gr.Markdown("**Carregar exemplo:**")
+            with gr.Row():
+                ex_btns = [gr.Button(label, size="sm") for label in EXAMPLES]
+
             with gr.Row():
 
-                # Coluna esquerda — input
-                with gr.Column(scale=1):
+                # Coluna esquerda — input (menor)
+                with gr.Column(scale=2):
                     xml_input = gr.Textbox(
                         label="XML eSocial / EFD-Reinf",
-                        lines=16,
-                        placeholder="Cole o XML de retorno rejeitado aqui...",
+                        lines=18,
+                        placeholder="Cole aqui o XML de retorno rejeitado pela plataforma...\n\nOu clique em um dos exemplos acima para carregar um caso real.",
                     )
-                    mentor_mode = gr.Checkbox(
-                        label="Modo Mentor — explicacao didatica para analistas juniores",
-                        value=False,
+                    with gr.Row():
+                        mentor_mode = gr.Checkbox(
+                            label="Modo Mentor",
+                            value=False,
+                            scale=1,
+                        )
+                        diagnose_btn = gr.Button("Diagnosticar", variant="primary", scale=2)
+                    gr.Markdown(
+                        "_CPF, CNPJ e NIS sao removidos automaticamente antes do envio ao LLM (LGPD)._"
                     )
-                    diagnose_btn = gr.Button("Diagnosticar", variant="primary", size="lg")
 
-                # Coluna direita — output
-                with gr.Column(scale=2):
+                # Coluna direita — output (maior)
+                with gr.Column(scale=3):
                     output = gr.Markdown(
-                        value="O diagnostico aparecera aqui.",
-                        label="Resultado",
+                        value=(
+                            "### Como usar\n\n"
+                            "1. **Escolha um exemplo** acima ou cole seu proprio XML\n"
+                            "2. Clique em **Diagnosticar**\n"
+                            "3. Receba a causa raiz e os passos de resolucao\n\n"
+                            "---\n"
+                            "_O pipeline busca incidentes similares na base de "
+                            f"{_KB_TOTAL} casos documentados antes de gerar o diagnostico._"
+                        ),
                     )
 
-            # Exemplos clicaveis
-            gr.Markdown("#### Exemplos — clique para carregar")
-            gr.Examples(
-                examples=[[xml, False] for xml in EXAMPLES.values()],
-                inputs=[xml_input, mentor_mode],
-                label=None,
-                examples_per_page=5,
-            )
-
-            gr.Markdown(
-                "_Demo publica — nao use dados reais. "
-                "CPF, CNPJ e NIS sao removidos automaticamente antes do envio ao LLM._"
-            )
+            # Conectar botoes de exemplo ao xml_input
+            for btn, (label, xml_val) in zip(ex_btns, EXAMPLES.items()):
+                btn.click(fn=lambda v=xml_val: v, inputs=[], outputs=[xml_input])
 
         # ── Tab 2: Base de Conhecimento ────────────────────────────────────
         with gr.Tab(f"Base de Conhecimento ({_KB_TOTAL})"):

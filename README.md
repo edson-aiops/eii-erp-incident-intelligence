@@ -6,7 +6,7 @@ colorTo: red
 sdk: docker
 pinned: true
 license: mit
-short_description: Diagnóstico eSocial e EFD-Reinf com CRAG + Multi-Agent + Human-in-the-Loop
+short_description: Diagnostico eSocial e EFD-Reinf com CRAG e HITL
 ---
 
 # ⚙️ EII — ERP Incident Intelligence

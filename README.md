@@ -6,211 +6,228 @@ colorTo: red
 sdk: docker
 pinned: true
 license: mit
-short_description: Diagnóstico eSocial XML com CRAG + Human-in-the-Loop
+short_description: Diagnóstico eSocial e EFD-Reinf com CRAG + Multi-Agent + Human-in-the-Loop
 ---
 
 # ⚙️ EII — ERP Incident Intelligence
 
-**Protótipo de diagnóstico automatizado de rejeições eSocial com IA**  
-eSocial · CRAG Pipeline · SmartRouter Multi-LLM · Human-in-the-Loop · LGPD
+**Sistema de diagnóstico automatizado de rejeições eSocial e EFD-Reinf com IA**
 
-> ⚠️ **Status:** Protótipo técnico de portfólio. Não validado em produção com dados reais.  
-> A Knowledge Base cobre os casos mais comuns. Resultados variam conforme o evento e o contexto.
+eSocial · EFD-Reinf · CRAG Pipeline · SmartRouter Multi-LLM · LangGraph Deep Agents · Human-in-the-Loop · LGPD by Design
+
+[![Version](https://img.shields.io/badge/version-3.1-blue.svg)](https://github.com/edson-aiops/eii-erp-incident-intelligence)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![HuggingFace Space](https://img.shields.io/badge/🤗-HuggingFace_Space-yellow)](https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence)
+[![Python](https://img.shields.io/badge/Python-3.13-3776AB.svg)](https://www.python.org/)
+
+> ⚠️ **Status:** Protótipo técnico de portfólio. Não validado em produção com dados reais.
+> A Knowledge Base cobre 93 incidentes documentados (eSocial + EFD-Reinf). Resultados variam conforme o evento e o contexto.
 
 ---
 
 ## 🎯 O Problema
 
-Quando um evento eSocial é rejeitado pelo governo, o analista recebe um XML com código de erro.
-Diagnosticar a causa raiz e os passos corretos de resolução exige experiência específica em
-legislação trabalhista, leiautes do eSocial e regras de negócio da RFB.
+Quando um evento eSocial ou EFD-Reinf é rejeitado pelo governo, o analista recebe um XML com código de erro. Diagnosticar a causa raiz e os passos corretos de resolução exige experiência específica em legislação trabalhista, leiautes técnicos e regras de negócio da Receita Federal.
 
-O EII transforma esse XML em um diagnóstico estruturado em segundos — com roteamento automático
-de dados sensíveis para garantir conformidade com a LGPD.
+O EII transforma esse XML em um diagnóstico estruturado em segundos — com roteamento automático de dados sensíveis para garantir conformidade com a LGPD.
 
 ---
 
-## 💡 Como Usar
+## ✨ Funcionalidades
 
-1. Acesse a aba **🚨 Diagnóstico**
-2. Cole o XML de retorno do eSocial (ou carregue um exemplo)
-3. Clique em **🔍 Analisar XML**
-4. Revise o diagnóstico gerado — causa raiz + passos de resolução
-5. Acesse **✋ Aprovação (HITL)** para registrar sua decisão como analista
+### Pipeline de diagnóstico
+- **CRAG (Corrective RAG):** Retrieve → Grade → Generate → Evaluate → Reflexion
+- **Parser unificado:** detecta automaticamente eSocial vs EFD-Reinf (23 eventos R-* suportados: R-1000, R-1070, R-2010 a R-2099, R-4010 a R-4099, R-9000 a R-9015)
+- **Knowledge Base:** 93 incidentes mapeados (KB001-KB073 eSocial + KB074-KB093 EFD-Reinf)
 
----
+### Multi-agente
+- **LangGraph Deep Agents:** 8 nós (parse → router → retrieve → generate → evaluate → reflexion → finalize → intel)
+- **SmartRouter:** 9 provedores LLM com seleção automática por contexto (Groq Llama 3.3 70B, gemma2-9b-it, Cerebras, Mistral, Gemini, Ollama local, entre outros)
+- **IntelAgent:** análise proativa pós-diagnóstico (padrões recorrentes, sem chamada extra de LLM)
 
-## 🏗️ Arquitetura
+### Compliance e segurança
+- **PII Scrubbing LGPD:** CPF, CNPJ, NIS, campos EFD-Reinf (cnpjPrestador, cnpjContri, cpfProdRural) mascarados antes do envio ao LLM
+- **Roteamento LGPD-aware:** opção de forçar inferência local (Ollama) para casos sensíveis
+- **Auth SHA-256 + Windows Credential Manager (keyring)** na versão local
+- **Audit trail SQLite:** hash de cada decisão para rastreabilidade
+- **HITL (Human-in-the-Loop) como princípio:** nenhuma resolução executada automaticamente em sistemas externos
 
-```
-XML Rejeitado
-     │
-     ▼
-[xml_parser.py] → extrai evento, código de erro, campos
-     │
-     ▼
-[pii_detector.py] → detecta CPF / CNPJ / NIS
-     │
-  ┌──┴──┐
-PII?    Limpo
- │        │
-Ollama  Groq    ← SmartRouter (3 fases)
-gemma2  Llama 3.3 70B
-  └──┬──┘
-     │
-     ▼
-[CRAG Pipeline]
-  Retrieve → Grade → Generate → Evaluate (80%) → Reflexion
-     │
-     ▼
-[HITL Gate] → analista valida antes de fechar
-     │
-     ▼
-[SQLite Audit Log] + LangSmith @traceable
-```
-
-**CRAG (Corrective RAG):** recupera documentos da KB vetorial → LLM avalia relevância →
-gera diagnóstico com contexto filtrado → EvaluatorAgent valida qualidade (threshold 80%) →
-Reflexion auto-corrige se necessário.
+### Integrações
+- **REST API (FastAPI):** porta 8000, autenticação X-API-Key, 6 endpoints
+- **MCP Server (fastmcp):** integração com clientes compatíveis com Model Context Protocol
+- **Notifier email:** alertas HITL via SMTP (smtplib stdlib, sem dependências externas)
+- **Observabilidade:** LangSmith @traceable com metadata estruturada
 
 ---
 
-## 📚 Base de Conhecimento
+## 🏗️ Arquitetura Dual
 
-73 incidentes eSocial curados manualmente:
+| Versão | Arquivo | Onde roda | Quem usa |
+| --- | --- | --- | --- |
+| **Local** | `app.py` | PC do desenvolvedor | Operação interna (auth, SmartRouter, HITL, Ollama, dados reais) |
+| **Pública** | `app_hf.py` | HuggingFace Space | Demo aberta (sem auth, sem dados reais, KB lookup + Groq) |
 
-| Prioridade | Faixa | Exemplos |
-| --- | --- | --- |
-| 🔴 Crítico | KB001–KB020 | S-1200/MA-100, S-2200/E469, S-5001 |
-| 🟡 Alto | KB021–KB053 | DCTFWeb, EFD-Reinf, E214, E215 |
-| 🟢 Médio | KB054–KB073 | S-1000/E100, S-1005, validações cadastrais |
-
-Cada item contém: evento, código de erro, causa raiz, passos de resolução, tags e contador
-`validacoes` para boost de confiança no Qdrant.
+A versão local **nunca** é publicada no HuggingFace. O `Dockerfile` aponta exclusivamente para `app_hf.py`.
 
 ---
 
-## ⚙️ Configuração
-
-Adicione a Secret no HuggingFace Space:
-
-```
-GROQ_API_KEY=sua_chave_aqui
-```
-
-Chave gratuita em: [console.groq.com](https://console.groq.com)
-
-> A demo pública usa Groq com scrubbing de PII antes do envio.  
-> Para uso com dados reais, rode a versão local com Ollama (LGPD total).
-
----
-
-## 🔒 Human-in-the-Loop como Princípio de Design
-
-> Nenhuma resolução é marcada como executada sem aprovação explícita de um analista humano.
-
-Em contextos de eSocial, ações automáticas sem supervisão podem causar inconsistências no CNIS,
-autuações fiscais e passivos trabalhistas. O HITL é uma decisão intencional de design — não
-uma limitação técnica.
-
-Para incidentes com severidade **CRÍTICO**, o sistema exige confirmação de 3 checkboxes antes
-de registrar qualquer resolução.
-
----
-
-## 🛠️ Stack
+## 🚀 Stack Técnica
 
 | Camada | Tecnologia |
 | --- | --- |
-| LLM principal | Llama 3.3 70B via Groq API |
-| LLM LGPD (local) | gemma2:2b via Ollama |
-| SmartRouter | 9 providers — Groq, Claude, Gemini, Kimi, Cerebras, Qwen, DeepSeek, Mistral, Ollama |
-| Vector Store | Qdrant Cloud (prod) / ChromaDB (dev) |
-| Embeddings | all-MiniLM-L6-v2 (384 dims, Cosine) |
-| UI | Gradio 4.44.0 |
-| Observabilidade | LangSmith @traceable (6 steps) |
-| Persistência | SQLite + audit trail |
-| MCP Server | fastmcp — `eii_query` e `eii_escalate` |
-| Deploy | HuggingFace Spaces (Docker) |
+| Linguagem | Python 3.13 |
+| UI | Gradio >= 5.0 |
+| API REST | FastAPI |
+| Orquestração agentes | LangGraph |
+| Retrieval | ChromaDB (vetorial) |
+| Persistência | SQLite (audit, HITL, IntelAgent) |
+| LLM Provider principal | Groq API (Llama 3.3 70B) |
+| LLM Locais (opcional) | Ollama (Gemma, Llama, Qwen) |
+| Observabilidade | LangSmith (traces opcional) |
+| Secrets management | keyring (Windows Credential Manager) |
 
 ---
 
-## 🔌 MCP Server
+## 🧪 Como testar
 
-O EII é exposto como servidor MCP via **fastmcp**, permitindo integração com Claude e outros
-agentes LLM:
+### Versão pública (HuggingFace Space)
 
-```json
-{
-  "mcpServers": {
-    "eii": {
-      "command": "python",
-      "args": ["/path/to/mcp_server.py"],
-      "env": {"GROQ_API_KEY": "sua-chave"}
-    }
-  }
-}
+🔗 **[Acesse o Space](https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence)**
+
+1. Cole um XML eSocial ou EFD-Reinf rejeitado
+2. (Opcional) Informe o código do erro
+3. Receba o diagnóstico estruturado: causa raiz + passos de resolução + validação
+
+A demo pública usa apenas Groq (cloud) e KB completa. Sem autenticação.
+
+### Versão local (clone do repo)
+
+```bash
+git clone https://github.com/edson-aiops/eii-erp-incident-intelligence.git
+cd eii-erp-incident-intelligence
+pip install -r requirements.txt
+
+# Configure secrets via keyring
+python -c "import keyring; keyring.set_password('EII_Project', 'GROQ_API_KEY', 'sua-chave')"
+
+# Rode
+python app.py
+# Acesse http://127.0.0.1:7860
 ```
 
-Ferramentas disponíveis: `eii_query(xml)` e `eii_escalate(incident_id, status, notes)`.
+A versão local exige login (admin + senha configurados via keyring).
 
 ---
 
-## 🚀 Roadmap
+## 📦 Estrutura do projeto
 
-### ✅ Concluído (Phase 1–3)
-
-- [x] Pipeline CRAG base com ChromaDB
-- [x] KB com 73 incidentes eSocial curados
-- [x] EvaluatorAgent (threshold 80%) + Reflexion auto-correção
-- [x] SmartRouter multi-LLM (9 providers, 3 fases)
-- [x] ResilientLLM circuit breaker (Groq → Claude → GPT)
-- [x] Roteamento LGPD automático (PII → Ollama local)
-- [x] MCP Server via fastmcp
-- [x] Batch processing (ThreadPoolExecutor)
-- [x] Mentor Mode + HITL 3-checkbox
-- [x] LangSmith @traceable OBS-001
-- [x] Dev Container para GitHub Codespaces
-- [x] 72 testes automatizados
-
-### 🔄 Em progresso (Phase 4)
-
-- [ ] Migração para Deep Agents v0.5 (`create_deep_agent`)
-- [ ] Fork-Join assíncrono: 1 subagent por evento eSocial no Lote
-
-### ⏳ Planejado (Phase 5)
-
-- [ ] Dashboard de métricas com dados reais de piloto
-- [ ] API `/audit/traces` para auditoria
-- [ ] IntelAgent — curadoria autônoma da KB
-- [ ] Suporte a EFD-Reinf (R-xxxx) e DCTFWeb
-- [ ] API REST para integração com ticketing (JIRA, ServiceNow)
+```
+eii-erp-incident-intelligence/
+├── app.py                          # Versão local (auth + SmartRouter + HITL)
+├── app_hf.py                       # Versão pública (HF Space)
+├── api.py                          # REST API FastAPI
+├── crag_pipeline.py                # Pipeline CRAG base
+├── crag_pipeline_smartrouter.py    # Pipeline CRAG + SmartRouter
+├── knowledge_base.py               # KB 93 incidentes
+├── xml_parser.py                   # parse_xml_auto (eSocial + EFD-Reinf)
+├── notifier.py                     # Notificações email HITL
+├── observability.py                # LangSmith integration
+├── smartrouter/                    # 9 LLM providers
+├── src/deep_agents/                # LangGraph 8 nós
+├── src/intel_agent/                # Análise proativa
+├── tests/                          # Suite de testes
+├── CLAUDE.md                       # Contexto técnico para agentes IA
+├── STATUS.md                       # Estado atual do projeto
+├── WORKFLOW.md                     # Regras de trabalho git
+├── DUAL_MODE.md                    # Arquitetura local vs HF
+└── CHANGELOG.md                    # Histórico de versões
+```
 
 ---
 
-## 📄 Documentação
+## 📈 Roadmap
 
-| Doc | Descrição |
-| --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Histórico de versões por phase |
-| [docs/PRD.md](docs/PRD.md) | Product Requirements Document completo |
-| [CLAUDE.md](CLAUDE.md) | Contexto para Claude Code — arquitetura e MCP |
-| [smartrouter/README.md](smartrouter/README.md) | Documentação do SmartRouter |
+### Fases concluídas (v3.1)
 
----
+- ✅ **Fase 1 — Foundation (v1.0):** CRAG pipeline inicial, KB eSocial base
+- ✅ **Fase 2 — Intelligence & Compliance (v2.0):** Reflexion loop, PII scrubbing LGPD, HITL como design
+- ✅ **Fase 3 — Production (v2.2):** SmartRouter multi-LLM, MCP Server, autenticação
+- ✅ **Fase 4 — Deep Agents (v2.3):** LangGraph 8 nós, IntelAgent, REST API FastAPI, admin
+- ✅ **Fase 5 — Observability & Scale (v3.1):** LangSmith traces, KB 93 incidentes, parser EFD-Reinf unificado, Notifier email
 
-## 👨‍💻 Desenvolvedor
+### Próxima fase
 
-*Edson Oliveira · Senior IT Systems Analyst · 12+ anos em HCM/ERP*  
-*IA aplicada a compliance e operações de RH no Brasil*
-
-[![GitHub](https://img.shields.io/badge/GitHub-eii--erp--incident--intelligence-181717?style=for-the-badge&logo=github)](https://github.com/edson-aiops/eii-erp-incident-intelligence)
-[![HuggingFace](https://img.shields.io/badge/🤗_HuggingFace-eii--erp--incident--intelligence-FFD21E?style=for-the-badge)](https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence)
+🔲 **Fase 6 — SaaS & Integrações (v4.0)** (aguarda gatilho de validação real com 2ª empresa)
+- Multitenancy (tenant_id em SQLite, ChromaDB, auth)
+- Pipeline EFD-Reinf integrado ao router_node dos Deep Agents
+- `app_hf.py` v2 (demo pública refinada com KB 93)
 
 ---
 
-[![GitHub Repo](https://img.shields.io/badge/GitHub-Código_Completo-181717?style=for-the-badge&logo=github)](https://github.com/edson-aiops/eii-erp-incident-intelligence)
-[![Tests](https://img.shields.io/badge/Tests-72_passing-22C55E?style=for-the-badge)](https://github.com/edson-aiops/eii-erp-incident-intelligence/blob/main/tests/test_phase2.py)
-[![MIT License](https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge)](LICENSE)
-[![LGPD](https://img.shields.io/badge/LGPD-Privacy_by_Design-009B7D?style=for-the-badge)](docs/PRD.md)
-[![Phase](https://img.shields.io/badge/Phase-3_Complete-3776AB?style=for-the-badge)](CHANGELOG.md)
+## 🔒 Segurança e Compliance
+
+### LGPD por design
+- PII (CPF, CNPJ, NIS, dados EFD-Reinf) é mascarado **antes** de qualquer chamada ao LLM
+- Opção de inferência 100% local via Ollama para dados ultra-sensíveis
+- Sem armazenamento de dados pessoais identificáveis nos logs
+
+### Por que HITL é decisão consciente (não limitação)
+Em compliance trabalhista brasileiro, ações executadas automaticamente em sistemas como CNIS, RFB ou folha de pagamento podem causar:
+- Inconsistências previdenciárias
+- Autuações fiscais retroativas
+- Passivos trabalhistas (FGTS, INSS, IR)
+
+O EII **propõe** o diagnóstico e os passos de resolução. **Um analista humano** aprova e executa. Esse design é exigência de qualquer cliente sério em folha de pagamento.
+
+---
+
+## 📊 Observabilidade
+
+Quando `LANGSMITH_API_KEY` está configurado:
+- Cada execução do pipeline gera trace estruturado
+- Metadata inclui: incident_id, tipo de evento, código de erro, versão da KB
+- Retenção sugerida: 5 anos (alinhado com CLT art. 11)
+
+---
+
+## 🤝 Contribuições
+
+Projeto open source MIT. Contribuições são bem-vindas, especialmente:
+- Novos incidentes mapeados para a KB
+- Suporte a novos eventos EFD-Reinf (R-1000, R-1070, R-2010, etc.)
+- Melhorias no parser XML
+- Casos de teste adicionais
+
+Antes de contribuir, leia `WORKFLOW.md` para entender o fluxo de branches e commits.
+
+---
+
+## 📚 Referências
+
+- [Leiaute eSocial S-1.3](https://www.gov.br/esocial/pt-br)
+- [Manual EFD-Reinf 2.1.2](http://sped.rfb.gov.br/pasta/show/2225)
+- [Anthropic Claude Documentation](https://docs.claude.com/)
+- [LangGraph](https://langchain-ai.github.io/langgraph/)
+- [Groq API](https://console.groq.com/docs)
+
+---
+
+## 👤 Autor
+
+**Edson Oliveira** — Senior IT Systems Analyst em transição para AI Agentic Engineering
+
+- LinkedIn: [edson-pereira-oliveira](https://www.linkedin.com/in/edson-pereira-oliveira)
+- GitHub: [edson-aiops](https://github.com/edson-aiops)
+- HuggingFace: [EdsonPO](https://huggingface.co/EdsonPO)
+
+12+ anos em HCM, folha de pagamento e ERP corporativo. Projeto de portfólio aplicado a perfis de Business Systems / Information Systems Analyst.
+
+---
+
+## 📄 Licença
+
+[MIT License](LICENSE) — uso, modificação e redistribuição livres com atribuição.
+
+---
+
+**Última atualização do README:** 09/05/2026 (v3.1)

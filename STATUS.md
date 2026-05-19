@@ -42,7 +42,7 @@
 | Claude (web) | Ativo | Fase 4/5 | feature/claude-* |
 | Claude Code (CLI) | Ativo | Fase 4/5 | feature/claude-* |
 | Qwen Coder | Ativo | Fase 3/4 | feature/qwen-* |
-| **Kimi K2.6** | **Ativo** | **Integracao protocolo multi-agente** | **feature/kimi-agents-update** |
+| **Kimi K2.6** | **Ativo** | **Health check + fixes Fase 5.1 (feature/kimi-healthcheck-fixes mergeada)** | **main** |
 | Cowork | Ativo | Fase 3 | feature/cowork-* |
 | Edson (humano) | Guardiao | Orquestracao | main |
 

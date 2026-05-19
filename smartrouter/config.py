@@ -38,9 +38,9 @@ PROVIDERS: dict[str, ProviderConfig] = {
     ),
     ProviderID.QWEN: ProviderConfig(
         id=ProviderID.QWEN,
-        name="Gemma 2 9B (via Groq)",
+        name="Llama 3.1 8B (via Groq)",
         base_url="https://api.groq.com/openai/v1",
-        model="gemma2-9b-it",
+        model="llama-3.1-8b-instant",
         api_key_env="GROQ_API_KEY",
         temperature=0.7,
         timeout_seconds=30.0,

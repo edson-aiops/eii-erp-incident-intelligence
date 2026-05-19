@@ -79,6 +79,7 @@
 |--------|--------|--------|-------------|
 | `feature/kimi-agents-update` | Kimi K2.6 | Integrar Kimi ao protocolo multi-agente (KIMI.md, STATUS.md) | 2026-05-19 |
 | `feature/kimi-update-devcontainer` | Kimi K2.6 | Atualizar devcontainer para Python 3.13 + docs | 2026-05-19 |
+| `feature/kimi-healthcheck-fixes` | Kimi K2.6 | Health check: fix smartrouter exports, modelo deprecado, configs | 2026-05-19 |
 
 ---
 

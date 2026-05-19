@@ -35,6 +35,17 @@
 | `api.py` | Funcionando | REST API FastAPI para integracao ERP/HCM |
 | `src/` | Em desenvolvimento | estrutura modular futura |
 
+### Agentes ativos no projeto
+
+| Agente | Status | Ultima atividade | Branch atual |
+|--------|--------|------------------|--------------|
+| Claude (web) | Ativo | Fase 4/5 | feature/claude-* |
+| Claude Code (CLI) | Ativo | Fase 4/5 | feature/claude-* |
+| Qwen Coder | Ativo | Fase 3/4 | feature/qwen-* |
+| **Kimi K2.6** | **Ativo** | **Integracao protocolo multi-agente** | **feature/kimi-agents-update** |
+| Cowork | Ativo | Fase 3 | feature/cowork-* |
+| Edson (humano) | Guardiao | Orquestracao | main |
+
 ### Credenciais configuradas (Windows Credential Manager)
 
 | Secret | Configurado | Como configurar |
@@ -49,6 +60,17 @@
 > NUNCA use `cmdkey /add` para guardar credenciais do EII.
 > `cmdkey` usa CRED_TYPE_DOMAIN_PASSWORD cujo blob e inacessivel a aplicacoes.
 > Use sempre `keyring.set_password()` ou `python secure_secrets.py set KEY VALUE`.
+
+---
+
+## Branches Abertas
+
+| Branch | Agente | Tarefa | Status | Desde |
+|--------|--------|--------|--------|-------|
+| `feature/kimi-agents-update` | Kimi K2.6 | Integrar Kimi ao protocolo multi-agente (AGENTS.md, WORKFLOW.md, KIMI.md, STATUS.md) | Em Progresso | 2026-05-19 |
+| `feature/claude-deep-agents-phase4` | Claude | Fase 4 Deep Agents (entregue, aguardando merge ou cleanup) | Pendente review | 2026-05-09 |
+| `feature/claude-fix-auth-fallback` | Claude | Fix auth fallback ctypes (entregue, provavelmente mergeado) | Pendente review | 2026-05-08 |
+| `feature/qwen-fix-smartrouter-export` | Qwen | Fix smartrouter export (entregue, provavelmente mergeado) | Pendente review | 2026-05-09 |
 
 ---
 
@@ -87,39 +109,18 @@
 - [x] EvaluatorAgent — avaliacao automatica de qualidade do diagnostico
 - [x] Batch Processor — analise paralela de multiplos XMLs
 - [x] **fix(auth): fallback ctypes para Windows Credential Manager** ← FEITO 2026-05-08
-  - `_read_wincred()` via `advapi32.CredReadW` — le GENERIC e DOMAIN_PASSWORD
-  - resolve incompatibilidade entre `keyring` e credenciais no Vault
-  - PR #2 mergeado em `main`
 - [x] **fix(smartrouter): qwen-qwq-32b descontinuado substituido** ← FEITO 2026-05-09
-  - `gemma2-9b-it` (QWEN) + `llama-3.3-70b-versatile` (DEEPSEEK) em `smartrouter/config.py`
 - [x] **fix(smartrouter): wrapper diagnosticar_incidente adicionado** ← FEITO 2026-05-09
-  - `crag_pipeline_smartrouter.py` — assinatura compatível com `crag_pipeline.diagnosticar_incidente`
-  - Pipeline agora usa Groq corretamente (antes caía em ollama-fallback por TypeError silencioso)
 - [x] **fix(ui): tema Gradio e CSS corrigidos** ← FEITO 2026-05-09
-  - `Monochrome` → `Default` + overrides CSS explícitos para texto escuro em fundo claro
 
 ---
 
-### Fase 4 — Deep Agents [EM PROGRESSO] `v2.3` (previsto)
+### Fase 4 — Deep Agents [CONCLUIDA] `v2.3`
 
 - [x] SmartRouter v2 — refatoracao modular em `smartrouter_v2/` (produzido pelo Qwen, revisado)
 - [x] Deep Agents pipeline — LangGraph StateGraph 7 nos implementados em `src/deep_agents/`
-  - parse_node: reutiliza xml_parser.parse_esocial_xml() + PII scrub
-  - router_node: roteia por severidade do evento eSocial (CRITICAL/HIGH->deep_reasoning, PII->sensitive_data)
-  - retrieve_node: ChromaDB + grade() de crag_pipeline.py
-  - generate_node: crag_pipeline.generate() com corrective_hint da reflexao
-  - evaluate_node: crag_pipeline.evaluate_diagnosis() com guarda MAX_ITERATIONS
-  - reflexion_node: crag_pipeline.reflect() -> corrective_hint para proxima iteracao
-  - finalize_node: ADR-001 logprobs confidence gate + final_result estruturado
 - [x] IntelAgent — agente de inteligencia proativa em `src/intel_agent/`
-  - analyze_patterns: frequencia/taxa aprovacao/MTTR/tendencia via SQLite
-  - suggest_related: incidentes KB por sobreposicao de tags
-  - build_alerts: alertas automaticos por thresholds
-  - intel_node: no LangGraph pos-finalize, adiciona proactive_insights ao AgentState
 - [x] Integracao com sistema ERP/HCM real via API — REST API FastAPI em `api.py`
-  - GET /health, POST /v1/diagnose, GET /v1/incidents, GET /v1/incidents/{id}
-  - POST /v1/incidents/{id}/approve, POST /v1/incidents/{id}/reject
-  - Auth via X-API-Key (keyring EII_API_KEY)
 - [x] Tela de admin — painel admin em aba dedicada (Sessoes, Estatisticas, Alterar Senha)
 - [x] Upload de arquivo XML — gr.File + handler load_xml_file em app.py
 
@@ -131,39 +132,30 @@
 ### Fase 5 — Observability & Scale [CONCLUIDA] `v3.1`
 
 - [x] LangSmith traces completos — um span por agente
-  - observability.py: suporte a LANGSMITH_API_KEY + LANGCHAIN_API_KEY, add_run_metadata()
-  - router/generate/evaluate/finalize/intel nodes: add_run_metadata com campos de negocio
-  - IntelAgent.run(): @traceable via observability (span EII.IntelAgent.run)
-  - api.py: _traced_diagnose com @traceable (span EII.API.diagnose)
 - [x] Dashboard de metricas — MTTR, taxa de resolucao automatica, escalation rate
-  - admin_get_metrics() retorna (kpi_md, fig_status, fig_trend) com matplotlib
-  - gr.Plot para graficos de status (barra horizontal) e tendencia (linha 30d)
-  - Aba "Metricas" no painel admin do app.py
 - [x] KB expandida — 93 incidentes (era 73), EFD-Reinf cobertura completa
-  - KB074-KB093: 20 incidentes EFD-Reinf adicionados
-  - Cobre: R-1000, R-2010, R-2020, R-2050, R-2060, R-2098, R-2099, R-4010, R-4020, R-4040, R-4080, R-4099, R-9001
-  - Erros ERF001-ERF050 documentados com causa_raiz, passos_resolucao, validacao
 - [x] Suporte a EFD-Reinf — parser xml_parser.py com 20 eventos R-* e parse_xml_auto
-  - EFDREINF_EVENTS: R-1000, R-2010, R-2020, R-2050, R-2060, R-2098, R-2099, R-4010..R-4099, R-9001
-  - parse_efdreinf_xml: retornoLoteEventos + retornoEvt* + generico; cdRetorno/descRetorno
-  - parse_xml_auto: entrada unificada detecta eSocial vs EFD-Reinf automaticamente
-  - PII scrubbing: cnpjPrestador, cnpjTomador, cnpjContri, cpfProdRural
-  - 29 novos testes (suite total: 37 passed)
 - [x] Notificacao por e-mail — alerta quando incidente aguarda HITL
-  - `notifier.py`: stdlib pura (smtplib + email.mime), sem nova dependencia
-  - Config: EII_SMTP_HOST/PORT/USER/PASS + EII_ALERT_EMAIL via keyring
-  - Envia em background thread (nao bloqueia pipeline)
-  - HTML com severidade, causa raiz, passos e link para o dashboard
-  - Suporta TLS (porta 587) e SSL (porta 465); multiplos destinatarios (virgula)
-  - Integrado em `eii_handlers.query_incident()` pos _db_save_pending
+
+---
+
+### Fase 5.1 — Integracao Kimi K2.6 [EM PROGRESSO]
+
+- [ ] Atualizar AGENTS.md — adicionar Kimi K2.6 na tabela de agentes
+- [ ] Atualizar WORKFLOW.md — adicionar feature/kimi-* nos exemplos de branch
+- [ ] Criar KIMI.md — contexto técnico para sessões Kimi (similar a CLAUDE.md)
+- [ ] Atualizar STATUS.md — registrar Kimi como agente ativo
+- [ ] Merge na main — aprovação do Edson
+- [ ] Push origin + hf — sincronizar todos os ambientes
+
+**Responsavel:** Kimi K2.6 (analise + geracao docs) + Edson (merge + push)
+**Branch:** `feature/kimi-agents-update`
 
 ---
 
 ### Fase 6 — SaaS & Integrações [PLANEJADO] `v4.0`
 
 - [ ] Multitenancy — isolar dados por empresa (tenant_id em SQLite, ChromaDB e auth)
-  - Requisito: segunda empresa real solicitando acesso
-  - Impacto: auth, SQLite, ChromaDB, API, app.py
 - [ ] Pipeline EFD-Reinf completo — eventos R-* no deep agents router_node
 - [ ] app_hf.py v2 — demo publica com EFD-Reinf e KB lookup visivel
 
@@ -196,6 +188,7 @@
 | Dependencia adicionada | Registrar em CHANGELOG.md + atualizar requirements.txt |
 | Decisao de arquitetura | Registrar em CHANGELOG.md com contexto do porque |
 | Fase concluida | Mover para [CONCLUIDA] + adicionar tag git |
+| Novo agente integrado | Atualizar tabela "Agentes ativos no projeto" |
 
 ### O que registrar em CHANGELOG.md quando mudar algo:
 
@@ -212,7 +205,7 @@
 | `app.py` | Dashboard local v2.2 | Features internas, auth, UI local |
 | `app_hf.py` | Demo publica HuggingFace | UI publica, copy para recrutadores |
 | `crag_pipeline.py` | Pipeline CRAG principal | Logica de retrieve/grade/generate |
-| `smartrouter/` | Roteamento de LLMs | Novo provider, nova estrategia |
+| `smartrouter/` | Roteamento de LLMs | Novo provider, nova estratégia |
 | `xml_parser.py` | Parse de XML eSocial | Novo formato, novo evento |
 | `knowledge_base.py` | Base de incidentes | Novo incidente documentado |
 | `secure_secrets.py` | Gerenciador de secrets | Novo tipo de secret |
@@ -224,7 +217,10 @@
 | `STATUS.md` | Este arquivo | A CADA mudanca no projeto |
 | `CHANGELOG.md` | Historico de versoes | A CADA mudanca funcional |
 | `WORKFLOW.md` | Fluxo de trabalho git | Mudanca no processo |
-| `DUAL_MODE.md` | Arquitetura dual local/HF | Mudanca na estrategia de deploy |
+| `DUAL_MODE.md` | Arquitetura dual local/HF | Mudanca na estratégia de deploy |
+| `AGENTS.md` | Protocolo multi-agente | Novo agente, nova regra |
+| `KIMI.md` | Contexto para sessoes Kimi | Mudanca no projeto que afeta contexto Kimi |
+| `CLAUDE.md` | Contexto tecnico para agentes Claude | Mudanca no projeto que afeta contexto Claude |
 
 ---
 
@@ -255,16 +251,17 @@ for k in ['GROQ_API_KEY','EII_ADMIN_USER','EII_ADMIN_PASS','QDRANT_API_KEY']:
 
 | Data | Decisao | Motivo |
 |---|---|---|
+| 2026-05-19 | **Integrar Kimi K2.6 ao protocolo multi-agente** | 262K contexto para análise de estado, MCP nativo, open-weight, complementa Claude/Qwen |
 | 2026-05-08 | `_read_wincred()` via ctypes em vez de depender so do keyring | keyring nao le credenciais salvas via cmdkey (DOMAIN_PASSWORD tem blob vazio) |
 | 2026-05-08 | `cmdkey` descartado como metodo de armazenamento | blob DOMAIN_PASSWORD e inacessivel a aplicacoes por design do Windows |
 | 2026-05-08 | `secure_secrets.py set` como padrao para secrets | armazena como CRED_TYPE_GENERIC, legivel pelo app |
-| mai/2026 | Modo Dual app.py vs app_hf.py | separar versao interna (com auth/dados reais) da vitrine publica |
+| mai/2026 | Modo Dual app.py vs app_hf.py | separar versao interna (auth/dados reais) da vitrine publica |
 | mai/2026 | SmartRouter com 9 LLMs | resiliencia e custo: rotear por tarefa, nao usar 70B pra tudo |
 | mai/2026 | SQLite para audit trail | persistencia sem dependencia externa, portavel |
 | mai/2026 | Logprobs para confianca | mais confiavel que o LLM auto-reportar confianca no JSON |
 
 ---
 
-**Ultima atualizacao:** 2026-05-09 (v3.0.1 — fixes UI tema, SmartRouter qwen-qwq-32b, pipeline signature)
+**Ultima atualizacao:** 2026-05-19 (v3.1 — adicionado Kimi K2.6 ao protocolo multi-agente)
 **Autor:** Edson Oliveira
 **Mantido por:** obrigatorio — qualquer mudanca no projeto atualiza este arquivo

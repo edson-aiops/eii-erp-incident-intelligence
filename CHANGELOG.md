@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — Fase 5.1
+
+### Added
+
+- **docs(agents): integrar Kimi K2.6 ao protocolo multi-agente**
+  - `AGENTS.md` v1.1 — adicionado Kimi K2.6 na tabela de agentes, regras de convivência,
+    fluxo padrão, cenários reais, e mapa de arquivos de coordenação
+  - `WORKFLOW.md` — adicionado `feature/kimi-*` nos exemplos de branch, cheatsheet,
+    e regras anti-retrocesso (6 agentes agora)
+  - `KIMI.md` (novo) — contexto técnico específico para sessões Kimi, similar a `CLAUDE.md`:
+    stack resumida, arquivos chave, ADRs, comandos comuns, limitações conhecidas,
+    MCP server do EII, matriz de uso Kimi vs outros agentes, checklist de sessão
+  - `STATUS.md` — adicionada tabela "Agentes ativos no projeto", Fase 5.1 em progresso,
+    branch `feature/kimi-agents-update` em "Branches Abertas"
+  - Kimi K2.6: 262K context window, arquitetura 1T MoE/32B ativos/384 experts,
+    swarm 300 sub-agentes, MCP nativo, open-weight (Modified MIT),
+    compatível OpenAI + Anthropic APIs
+
+---
+
 ## [3.1] — 2026-05-09
 
 ### Changed
@@ -117,127 +137,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `api.py`: `_traced_diagnose()` wrapper com `@observability.traceable`
     (span `EII.API.diagnose`) aplicado no startup — endpoints rastreados sem
     alterar assinatura do handler FastAPI
-
-
-
-### Added (Fase 4 — v2.3 em progresso)
-
-- **feat(deep-agents): LangGraph pipeline 7 nos — Phase 4** (branch `feature/claude-deep-agents-phase4`)
-  - `src/deep_agents/state.py` — `AgentState` TypedDict com todos os campos corretos;
-    adicionado campo `needs_refinement: bool` que estava ausente e quebrava `should_reflexion()`
-  - `src/deep_agents/nodes/parse_node.py` — reescrito para reutilizar `xml_parser.parse_esocial_xml()`
-    (PII scrub incluso); corrige bug `meta=` → `metadata=` do kwarg do dataclass `IncidentContext`
-  - `src/deep_agents/nodes/router_node.py` — substitui stub generico; roteia por severidade real do
-    evento eSocial: CRITICAL/HIGH → `deep_reasoning`, PII detectado → `sensitive_data`, demais → `validation`
-  - `src/deep_agents/nodes/retrieve_node.py` — implementa `build_vector_store()+retrieve()+grade()`
-    de `crag_pipeline.py`; query composta de evento+codigo_erro+ocorrencias
-  - `src/deep_agents/nodes/generate_node.py` — delega para `crag_pipeline.generate()` com
-    `corrective_hint` vindo da reflexao anterior; fallback estruturado se LLM falhar
-  - `src/deep_agents/nodes/evaluate_node.py` — delega para `crag_pipeline.evaluate_diagnosis()`;
-    guarda `MAX_ITERATIONS=2` evita loop infinito; `should_reflexion()` usa `state.needs_refinement`
-  - `src/deep_agents/nodes/reflexion_node.py` — delega para `crag_pipeline.reflect()`;
-    armazena reflection em `evaluation_feedback` como corrective_hint para proxima iteracao
-  - `src/deep_agents/nodes/finalize_node.py` — aplica ADR-001 logprobs confidence gate;
-    constroi `final_result` estruturado com metadata completo (kb_version, logprob_sim, routing)
-  - `src/deep_agents/nodes/__init__.py` — corrige imports para usar `reflexion_node.py` e
-    `finalize_node.py` separados (em vez do antigo stub `reflexion_finalize_nodes.py`)
-  - Graph compilado e smoke-tested E2E: pipeline flui parse→router→retrieve→generate→evaluate→finalize
-    com tratamento de erro gracioso em cada no
-
-- **feat(intel-agent): IntelAgent — agente de inteligencia proativa** (2026-05-09)
-  - `src/intel_agent/intel_agent.py` — classe `IntelAgent` com:
-    - `analyze_patterns(evento, codigo_erro, history)`: consulta SQLite (90 dias),
-      calcula total de ocorrencias, taxa de aprovacao HITL, tempo medio de resolucao
-      em horas e tendencia (CRESCENTE/ESTAVEL/DECRESCENTE) comparando janelas de 30d
-    - `suggest_related(referencias_kb)`: tag-overlap com Knowledge Base, retorna
-      top-3 incidentes KB mais relacionados por tags em comum
-    - `build_alerts(patterns, evento, codigo_erro)`: gera alertas textuais proativos
-      baseados em thresholds (>= 5 ocorrencias, tendencia crescente, taxa HITL < 50%,
-      MTTR > 8h)
-    - `run(final_result)`: orquestra tudo, retorna `ProactiveInsights` com
-      `padrao_historico`, `incidentes_relacionados`, `alertas`, `risco_recorrencia`
-  - `src/intel_agent/__init__.py` — modulo exportavel
-  - `src/deep_agents/nodes/intel_node.py` — no LangGraph async que chama `IntelAgent.run()`
-    e adiciona `proactive_insights` ao `AgentState`; erros sao capturados sem quebrar o pipeline
-  - `src/deep_agents/state.py` — adicionado campo `proactive_insights: Optional[Dict]`
-  - `src/deep_agents/graph.py` — adicionado no `intel` pos-`finalize`; fluxo agora e
-    `finalize → intel → END` (antes era `finalize → END`)
-  - Sem chamadas a LLM — analise puramente deterministica e sincrona; zero latencia adicional
-    em pipelines sem historico
-
-- **feat(app): integrar IntelAgent na UI do app.py** (2026-05-09)
-  - `format_insights_md(insights)`: formata ProactiveInsights como markdown com tabela
-    de métricas, alertas destacados e lista de incidentes KB relacionados
-  - `_run_intel_agent(diagnosis)`: helper com graceful fallback (retorna `""` se
-    IntelAgent indisponível ou falhar)
-  - `INTEL_AGENT_AVAILABLE`: flag de disponibilidade com import lazy, igual ao padrão
-    dos outros módulos (Deep Agents, SmartRouter)
-  - `_diagnose_deep_agents`: agora retorna `tuple[str, str]` — extrai
-    `proactive_insights` do `AgentState` pós-`intel_node`; `proactive_insights: None`
-    adicionado ao `init_state`
-  - `_diagnose_internal`: agora retorna `tuple[str, str]`; chama `_run_intel_agent`
-    em todos os caminhos (Ollama, pipeline padrão, fallback Ollama)
-  - `diagnose_handler_secure`: agora retorna `tuple[str, str, str]`
-    (diagnosis_md, insights_md, error_msg)
-  - UI: `insights_output = gr.Markdown(visible=False)` adicionado abaixo do diagnóstico;
-    exibido automaticamente quando há insights, oculto quando vazio — mesmo padrão do
-    `error_output` via `.then()`
-
-- **feat(app): upload de arquivo XML via gr.File** (2026-05-09)
-  - `load_xml_file(file)`: lê arquivo XML do path temporário Gradio 5 (FileData Pydantic
-    ou dict); retorna `(conteúdo, nome_arquivo)`; compatível com ambos os formatos de
-    entrega do Gradio 5 (`file.path` / `file["path"]`)
-  - `gr.File(file_types=[".xml"])` adicionado acima do textbox XML no painel esquerdo
-  - `upload_status`: `gr.Markdown` que aparece com nome do arquivo após upload bem-sucedido
-  - Wiring: `.change()` → popula `xml_input`; `.then()` exibe status com nome do arquivo
-  - Textbox continua editável — upload e paste coexistem; usuário pode ajustar após carregar
-
-- **feat(app): painel administrativo** (2026-05-09)
-  - UI reestruturada com `gr.Tabs` — abas **Diagnóstico** e **Admin** na interface principal
-  - `_require_session(session_token)`: helper interno que valida sessão e retorna username
-  - `admin_get_sessions`: tabela markdown das sessões ativas em memória com
-    usuário, horário de login, última atividade, tempo até expirar e marcação
-    da sessão atual
-  - `admin_revoke_sessions`: remove todas as sessões exceto a atual; loga a ação
-  - `admin_get_stats`: query SQLite com totais por status, incidentes nos últimos
-    7 e 30 dias, MTTR médio em horas e último incidente registrado
-  - `admin_change_password`: valida nova senha (>=8 chars, confirmação), salva via
-    `keyring.set_password('EII_Project', 'EII_ADMIN_PASS', ...)` e atualiza
-    `ADMIN_PASSWORD_HASH` global em runtime — sem precisar reiniciar o servidor
-  - Aba Admin com 3 sub-abas: **Sessões Ativas** (atualizar + revogar),
-    **Estatísticas** (atualizar sob demanda), **Alterar Senha** (limpa campos após
-    alteração bem-sucedida via `.then()`)
-  - Todos os handlers validam sessão antes de qualquer operação
-
-- **feat(api): REST API FastAPI para integração ERP/HCM** (2026-05-09)
-  - `api.py` — FastAPI app v1.0.0 com documentacao automatica em `/docs` (Swagger)
-    e `/redoc`
-  - Autenticacao via header `X-API-Key` lido do keyring (`EII_API_KEY`) com fallback
-    para `os.environ`; retorna 401 se ausente/incorreto, 500 se nao configurado
-  - `GET /health` — sem auth; verifica DB SQLite e retorna timestamp UTC
-  - `POST /v1/diagnose` — recebe `{xml, erp_reference?}`; chama `eii_handlers.query_incident()`;
-    persiste como PENDING; devolve diagnostico completo + `erp_reference` espelhado
-    para correlacao no sistema ERP
-  - `GET /v1/incidents` — listagem paginada com filtro por status (PENDING/APPROVED/REJECTED);
-    paginacao via `?page=&page_size=` (max 100)
-  - `GET /v1/incidents/{incident_id}` — diagnostico completo + notas + decided_at
-  - `POST /v1/incidents/{incident_id}/approve` — HITL via API; aceita `{notes}`
-  - `POST /v1/incidents/{incident_id}/reject` — idem
-  - Wraps `eii_handlers.escalate_incident()` — compartilha mesmo SQLite do Gradio;
-    Gradio e API podem rodar em paralelo sem conflito (WAL mode)
-  - Rodar: `uvicorn api:app --host 0.0.0.0 --port 8000`
-  - `requirements.txt`: adicionado `fastapi>=0.111.0` e `uvicorn[standard]>=0.29.0`
-
-### Fase 4 CONCLUIDA (2026-05-09)
-Todos os itens planejados para a Fase 4 foram entregues nesta sessao.
-
-### Planned (Fase 5 — v3.0)
-- Expansao da KB para 100+ incidentes documentados
-- Suporte a EFD-Reinf (R-xxxx series)
-- Dashboard de metricas (MTTR, taxa de resolucao automatica, escalation rate)
-- API REST para integracao com ticketing (JIRA, ServiceNow)
-- Notificacao por e-mail quando incidente aguarda aprovacao HITL
-- Multitenancy para SaaS
 
 ---
 

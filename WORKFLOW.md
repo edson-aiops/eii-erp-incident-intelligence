@@ -12,6 +12,7 @@ main                     → Estado oficial. Sempre estável. Sempre alinhado Gi
   │
   ├── feature/claude-*   → Trabalho usando Claude (Anthropic)
   ├── feature/qwen-*     → Trabalho usando Qwen
+  ├── feature/kimi-*     → Trabalho usando Kimi (Moonshot AI)
   ├── feature/cowork-*   → Trabalho usando Claude Cowork
   └── fix/*              → Hotfixes pontuais
 ```
@@ -41,13 +42,11 @@ Use o prefixo da ferramenta que vai usar:
 # Trabalhando com Claude
 git checkout -b feature/claude-<descricao-curta>
 
-# Exemplos:
-# feature/claude-add-deepagents
-# feature/claude-fix-mcp-handler
-# feature/claude-improve-evaluator
-
 # Trabalhando com Qwen
 git checkout -b feature/qwen-<descricao-curta>
+
+# Trabalhando com Kimi
+git checkout -b feature/kimi-<descricao-curta>
 
 # Trabalhando com Cowork
 git checkout -b feature/cowork-<descricao-curta>
@@ -98,8 +97,9 @@ git push origin --delete feature/claude-<nome>
 3. **Não use `git filter-branch` na `main`** — reescreve histórico
 4. **Não delete tags de versão** (`v1.x`, `v2.x`) — são marcos imutáveis
 5. **Não misture trabalho de Claude e Qwen na mesma branch**
-6. **Não commite arquivos `.env`** — checked pelo `.gitignore`
-7. **Não commite arquivos de backup** (`*.bak`, `README_v*.md`)
+6. **Não misture trabalho de Kimi e Claude na mesma branch**
+7. **Não commite arquivos `.env`** — checked pelo `.gitignore`
+8. **Não commite arquivos de backup** (`*.bak`, `README_v*.md`)
 
 ### ✅ SEMPRE faça
 
@@ -199,6 +199,7 @@ git push hf v2.X
 | --- | --- |
 | **Iniciar tarefa nova (Claude)** | `git checkout main && git pull origin main && git checkout -b feature/claude-X` |
 | **Iniciar tarefa nova (Qwen)** | `git checkout main && git pull origin main && git checkout -b feature/qwen-X` |
+| **Iniciar tarefa nova (Kimi)** | `git checkout main && git pull origin main && git checkout -b feature/kimi-X` |
 | **Iniciar tarefa nova (Cowork)** | `git checkout main && git pull origin main && git checkout -b feature/cowork-X` |
 | **Salvar progresso** | `git add . && git commit -m "feat: msg"` |
 | **Finalizar tarefa** | `git checkout main && git merge feature/X && git push origin main && git push hf main` |
@@ -240,8 +241,9 @@ docs(hf): correct YAML front-matter
 | 1 — Foundation | ✅ Done | — |
 | 2 — KB + CRAG | ✅ Done | — |
 | 3 — Production (SmartRouter + MCP + LGPD) | ✅ Done | `v2.2` |
-| 4 — Deep Agents v0.5 | 🔄 Em progresso | `v2.3` (futuro) |
-| 5 — Observability + IntelAgent | ⏳ Planejado | `v3.0` (futuro) |
+| 4 — Deep Agents v0.5 | ✅ Done | `v2.3` |
+| 5 — Observability + IntelAgent | ✅ Done | `v3.1` |
+| 6 — SaaS & Integrações | ⏳ Planejado | `v4.0` (futuro) |
 
 ---
 
@@ -258,6 +260,6 @@ git remote -v
 
 ---
 
-**Última atualização:** $(Get-Date -Format "yyyy-MM-dd")
+**Última atualização:** 2026-05-19
 **Autor:** Edson Oliveira
 **Mantido por:** Disciplina + este arquivo

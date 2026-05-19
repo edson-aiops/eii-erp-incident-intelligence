@@ -78,6 +78,7 @@
 | Branch | Agente | Tarefa | Mergeado em |
 |--------|--------|--------|-------------|
 | `feature/kimi-agents-update` | Kimi K2.6 | Integrar Kimi ao protocolo multi-agente (KIMI.md, STATUS.md) | 2026-05-19 |
+| `feature/kimi-update-devcontainer` | Kimi K2.6 | Atualizar devcontainer para Python 3.13 + docs | 2026-05-19 |
 
 ---
 

@@ -274,11 +274,11 @@ def parse_esocial_xml(xml_content: str) -> ParsedXML:
 
     # ── Formato 1: retornoEnvioLoteEventos ───────────────────────────────
     lote_ret = next((c for c in root.iter() if _tag(c) == "retornoEnvioLoteEventos"), None)
-    if lote_ret:
+    if lote_ret is not None:
         result.formato = "lote"
         result.nr_inscricao = _text(lote_ret, "nrInsc")
         status = next((c for c in lote_ret.iter() if _tag(c) == "status"), None)
-        if status:
+        if status is not None:
             result.cd_resposta  = _text(status, "cdResposta")
             result.desc_resposta = _text(status, "descResposta")
         result.ocorrencias = _extract_ocorrencias(lote_ret)
@@ -367,12 +367,12 @@ def parse_efdreinf_xml(xml_content: str) -> ParsedXML:
 
     # ── Formato 1: retornoLoteEventos (EFD-Reinf) ────────────────────────────
     lote = next((c for c in root.iter() if _tag(c) == "retornoLoteEventos"), None)
-    if lote:
+    if lote is not None and len(lote) > 0:
         result.formato = "efdreinf_lote"
         result.nr_inscricao = (_text(lote, "nrInsc") or _text(root, "nrInsc"))
         # EFD-Reinf usa cdRetorno/descRetorno OU cdResposta/descResposta
         status = next((c for c in lote.iter() if _tag(c) == "status"), None)
-        if status:
+        if status is not None:
             result.cd_resposta  = (_text(status, "cdRetorno")
                                    or _text(status, "cdResposta") or "")
             result.desc_resposta = (_text(status, "descRetorno")
@@ -388,9 +388,9 @@ def parse_efdreinf_xml(xml_content: str) -> ParsedXML:
             # retornoEvento aninhado
             ret = next((c for c in evt_node.iter()
                         if _tag(c).startswith("retornoEvt")), None)
-            if ret:
+            if ret is not None:
                 ide = next((c for c in ret.iter() if _tag(c) == "ideStatus"), None)
-                if ide:
+                if ide is not None:
                     cd = (_text(ide, "cdRetorno") or _text(ide, "cdResposta"))
                     if cd and not result.cd_resposta:
                         result.cd_resposta = cd

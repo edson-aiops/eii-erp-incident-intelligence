@@ -139,12 +139,12 @@
 
 ---
 
-### Fase 5.1 — Integracao Kimi K2.6 [EM PROGRESSO]
+### Fase 5.1 — Integracao Kimi K2.6 [CONCLUIDA] `v3.1`
 
-- [ ] Atualizar AGENTS.md — adicionar Kimi K2.6 na tabela de agentes
-- [ ] Atualizar WORKFLOW.md — adicionar feature/kimi-* nos exemplos de branch
-- [ ] Criar KIMI.md — contexto técnico para sessões Kimi (similar a CLAUDE.md)
-- [ ] Atualizar STATUS.md — registrar Kimi como agente ativo
+- [x] Atualizar AGENTS.md — adicionar Kimi K2.6 na tabela de agentes
+- [x] Atualizar WORKFLOW.md — adicionar feature/kimi-* nos exemplos de branch
+- [x] Criar KIMI.md — contexto técnico para sessões Kimi (similar a CLAUDE.md)
+- [x] Atualizar STATUS.md — registrar Kimi como agente ativo
 - [ ] Merge na main — aprovação do Edson
 - [ ] Push origin + hf — sincronizar todos os ambientes
 

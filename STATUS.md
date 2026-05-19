@@ -67,10 +67,17 @@
 
 | Branch | Agente | Tarefa | Status | Desde |
 |--------|--------|--------|--------|-------|
-| `feature/kimi-agents-update` | Kimi K2.6 | Integrar Kimi ao protocolo multi-agente (AGENTS.md, WORKFLOW.md, KIMI.md, STATUS.md) | Em Progresso | 2026-05-19 |
 | `feature/claude-deep-agents-phase4` | Claude | Fase 4 Deep Agents (entregue, aguardando merge ou cleanup) | Pendente review | 2026-05-09 |
 | `feature/claude-fix-auth-fallback` | Claude | Fix auth fallback ctypes (entregue, provavelmente mergeado) | Pendente review | 2026-05-08 |
 | `feature/qwen-fix-smartrouter-export` | Qwen | Fix smartrouter export (entregue, provavelmente mergeado) | Pendente review | 2026-05-09 |
+
+---
+
+## Recentemente Concluído
+
+| Branch | Agente | Tarefa | Mergeado em |
+|--------|--------|--------|-------------|
+| `feature/kimi-agents-update` | Kimi K2.6 | Integrar Kimi ao protocolo multi-agente (KIMI.md, STATUS.md) | 2026-05-19 |
 
 ---
 

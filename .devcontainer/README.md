@@ -8,7 +8,7 @@ Ambiente pré-configurado para GitHub Codespaces (ou Docker local via Dev Contai
 
 1. Acesse o repositório no GitHub.
 2. Clique em **Code → Codespaces → Create codespace on main**.
-3. Aguarde o build da imagem e a execução do `postCreateCommand` (instala todas as dependências automaticamente).
+3. Aguarde o build da imagem (Python 3.13) e a execução do `postCreateCommand` (instala todas as dependências automaticamente).
 
 ---
 
@@ -25,6 +25,8 @@ As variáveis abaixo **não têm valores no repositório** — configure-as como
 | `LANGFUSE_PUBLIC_KEY` | Chave pública do Langfuse (observabilidade) |
 | `LANGFUSE_SECRET_KEY` | Chave secreta do Langfuse |
 | `LANGFUSE_BASE_URL` | URL base do Langfuse (ex.: `https://cloud.langfuse.com`) |
+
+> **Dica:** Configure também `EII_ADMIN_USER` e `EII_ADMIN_PASS` se for usar autenticação no app local via Codespace.
 
 Os secrets são injetados automaticamente como variáveis de ambiente no Codespace.
 
@@ -49,3 +51,16 @@ python -m pytest tests/test_phase2.py -v
 # Smoke test end-to-end contra o HF Space (requer rede)
 python scripts/test_e2e_hf.py
 ```
+
+---
+
+## Arquivos de Coordenação (leia antes de codar)
+
+| Arquivo | Função |
+|---|---|
+| `STATUS.md` | Estado atual, branches, roadmap |
+| `AGENTS.md` | Protocolo multi-agente (Claude, Qwen, Kimi, Cowork) |
+| `WORKFLOW.md` | Regras de branches e commits |
+| `DUAL_MODE.md` | Arquitetura local vs HuggingFace |
+| `CLAUDE.md` | Contexto técnico para sessões Claude |
+| `KIMI.md` | Contexto técnico para sessões Kimi K2.6 |

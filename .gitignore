@@ -107,6 +107,12 @@ ollama_cache/
 .qdrant/
 
 # ───────────────────────────────────────────────
+# Experimento arquivado (dataset PDF)
+# ───────────────────────────────────────────────
+experimentos/dataset-pdf-arquivado/dados/
+manual_esocial_s13.pdf
+
+# ───────────────────────────────────────────────
 # Logs
 # ───────────────────────────────────────────────
 *.log

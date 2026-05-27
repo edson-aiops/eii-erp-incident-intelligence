@@ -37,45 +37,13 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MODO MENTOR & HITL CHECKLIST
+# MODO MENTOR
 # ─────────────────────────────────────────────────────────────────────────────
 
-MENTOR_PROMPT_ADDON = """
----
-🎓 MODO MENTOR ATIVADO:
-Explique a causa raiz como se estivesse treinando um analista júnior.
-Inclua:
-1. Conceito técnico envolvido
-2. Por que o eSocial rejeita esse formato
-3. Dica de prevenção para futuros envios
-"""
-
-HITL_CHECKLIST = [
-    "✅ XML validado contra schema oficial eSocial",
-    "✅ Campos obrigatórios preenchidos conforme manual",
-    "✅ Testado em ambiente de produção limitada (staging)",
-    "✅ Backup do arquivo original realizado",
-    "✅ Responsável técnico ciente da alteração"
-]
-
 def apply_mentor_mode(diagnosis_text: str, mentor_enabled: bool) -> str:
-    """Adiciona seção de mentor e checklist ao diagnóstico"""
-    if not mentor_enabled:
-        return diagnosis_text
-    
-    mentor_section = f"""
----
-🎓 **Nota do Mentor (Modo Didático)**
-{MENTOR_PROMPT_ADDON.strip()}
-
-📋 **Checklist de Validação (HITL)**
-Antes de prosseguir com o envio, confirme:
-"""
-    for item in HITL_CHECKLIST:
-        mentor_section += f"- [ ] {item}\n"
-    
-    mentor_section += "\n💡 *Dica: Marque todos os itens antes de dar o incidente como resolvido.*"
-    return diagnosis_text + mentor_section
+    """Retorna o diagnóstico inalterado. O Modo Mentor atua via system prompt
+    do pipeline CRAG (_MENTOR_INSTRUCTION), não por texto extra na UI."""
+    return diagnosis_text
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LANGSMITH OBSERVABILITY (Graceful Integration)

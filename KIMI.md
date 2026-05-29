@@ -123,7 +123,7 @@ api.py                  REST API FastAPI v1 (porta 8000, X-API-Key)
 notifier.py             Alertas HITL por e-mail (smtplib stdlib)
 crag_pipeline.py        Pipeline CRAG principal
 smartrouter/            Roteamento multi-LLM (v1, em uso)
-smartrouter_v2/         Refatoracao modular (em desenvolvimento)
+smartrouter_v2/         ~~Refatoracao modular~~ removido (código morto, nunca integrado)
 xml_parser.py           Parser unificado eSocial + EFD-Reinf (parse_xml_auto)
 knowledge_base.py       93 incidentes (eSocial + EFD-Reinf)
 eii_handlers.py         Handlers puros Python (MCP + API)

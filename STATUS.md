@@ -29,7 +29,7 @@
 | `secure_secrets.py` | Funcionando | Windows Credential Manager |
 | `batch_processor.py` | Funcionando | processamento paralelo |
 | `observability.py` | Parcial | LangSmith opcional |
-| `smartrouter_v2/` | Em desenvolvimento | nao integrado ainda |
+| `smartrouter_v2/` | ~~Removido~~ | código morto eliminado em 2026-05-28 |
 | `src/deep_agents/` | Funcionando | pipeline LangGraph 8 nos (Phase 4 + intel_node) |
 | `src/intel_agent/` | Funcionando | analise proativa pos-diagnostico (Phase 4) |
 | `api.py` | Funcionando | REST API FastAPI para integracao ERP/HCM |

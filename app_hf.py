@@ -1,6 +1,6 @@
 """
 EII — ERP Incident Intelligence (PUBLIC DEMO v3.0)
-Versão para HuggingFace Spaces: CRAG-lite + KB lookup + PII Scrubbing + Groq Cloud
+Versão para HuggingFace Spaces: busca por palavra-chave + LLM (Groq) + KB lookup + PII Scrubbing
 """
 import os
 import re
@@ -85,7 +85,7 @@ def _scrub_pii(text: str) -> tuple[str, int]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Groq — CRAG-lite
+# Groq — geração de diagnóstico (busca por palavra-chave na KB + LLM)
 # ─────────────────────────────────────────────────────────────────────────────
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")

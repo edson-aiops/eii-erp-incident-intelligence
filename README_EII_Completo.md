@@ -98,7 +98,7 @@ O EII recebe o XML rejeitado pelo eSocial, detecta automaticamente se há dados 
   PII Found   PII Clean
      │           │
      ▼           ▼
- [Ollama]    [Groq API]       ← SmartRouter (3 fases de roteamento)
+ [Ollama]    [Groq API]       ← SmartRouter (Fase 1: Rules implementada; Fases 2-3: roadmap)
  Local LLM   Cloud LLM
  Gemma4 26B  Llama 3.3 70B
      │           │
@@ -110,8 +110,8 @@ O EII recebe o XML rejeitado pelo eSocial, detecta automaticamente se há dados 
   │                                      │
   │  1. Retrieve   → Qdrant / ChromaDB   │
   │  2. Grade      → Relevance Check     │
-  │  3. Generate   → DiagnosticAgent     │
-  │  4. Evaluate   → EvaluatorAgent 80%  │
+  │  3. Generate   → nó generate (diagnóstico) │
+  │  4. Evaluate   → nó evaluate (avaliação 80%) │
   │  5. Reflexion  → Auto-correção       │
   └──────────────┬───────────────────────┘
                  │
@@ -248,20 +248,20 @@ Aplica regex calibrada para detecção de PII (Personally Identifiable Informati
 
 #### Módulo 3: `smartrouter/` — Orquestração Multi-LLM
 
-O SmartRouter implementa 3 fases de roteamento:
+O SmartRouter implementa roteamento por regras (Fase 1). Fases 2 e 3 estão no roadmap:
 
 ```
-Fase 1: Rules Engine
+Fase 1: Rules Engine (implementada)
   ├── PII detectado? → Ollama (local, LGPD)
   ├── Evento crítico S-5001/S-5003? → Claude Haiku
   └── Análise padrão → Groq (Llama 3.3 70B)
 
-Fase 2: Smart Classification (Cerebras 3000 tok/s)
+Fase 2: Smart Classification (Cerebras 3000 tok/s) — roadmap
   ├── Tarefa de codegen? → Kimi K2
   ├── Contexto longo (>100k tokens)? → Gemini 2.5 Flash
   └── Raciocínio complexo? → Qwen QwQ-32B
 
-Fase 3: Adaptive Routing
+Fase 3: Adaptive Routing — roadmap
   └── Aprende com histórico de performance por tipo de evento
 ```
 
@@ -275,20 +275,23 @@ Groq (primário)
 
 #### Módulo 4: `crag_pipeline.py` — Pipeline CRAG
 
-O coração do EII. Implementa **Corrective RAG** com 6 agentes em sequência:
+O coração do EII. Implementa **Corrective RAG** com pipeline de 8 nós orquestrado por LangGraph:
 
-| Agente | Função | ADR |
-|--------|---------|-----|
-| `Retriever` | Busca vetorial no Qdrant (73 itens, 384 dims) | — |
-| `RelevanceCheck` | Filtra documentos irrelevantes com LLM judge | — |
-| `DiagnosticAgent` | Gera causa raiz + passos de resolução | ADR-001 |
-| `EvaluatorAgent` | Avalia qualidade em 5 critérios (threshold 80%) | ADR-001 |
-| `Reflexion` | Auto-corrige se qualidade < threshold | ADR-002 |
-| `HITL Gate` | Bloqueia resolução sem validação humana | — |
+| Nó / Etapa | Função | ADR |
+|------------|---------|-----|
+| `parse` | Parseia XML e extrai metadados | — |
+| `router` | Classifica severidade e decide roteamento | — |
+| `retrieve` | Busca vetorial no ChromaDB/Qdrant | — |
+| `grade` | Filtra documentos irrelevantes com LLM judge | — |
+| `generate` | Gera causa raiz + passos de resolução | ADR-001 |
+| `evaluate` | Avalia qualidade em 5 critérios (threshold 80%) | ADR-001 |
+| `reflexion` | Auto-corrige se qualidade < threshold | ADR-002 |
+| `finalize` | Aplica gate de confiança e consolida resultado | ADR-001 |
+| `intel` | Insights proativos via IntelAgent | — |
 
-**ADR-001 — EvaluatorAgent:** 5 critérios avaliados (precisão técnica, acionabilidade, cobertura, clareza, risco), threshold de 80% para aprovação automática. 13 testes unitários.
+**ADR-001 — Avaliação automática:** 5 critérios avaliados (precisão técnica, acionabilidade, cobertura, clareza, risco), threshold de 80% para aprovação automática. 13 testes unitários.
 
-**ADR-002 — Reflexion:** Quando EvaluatorAgent reprova, o pipeline envia o diagnóstico + crítica de volta ao DiagnosticAgent para auto-correção. Máximo 2 iterações (MAX_ITER=2). 13 testes unitários.
+**ADR-002 — Reflexion:** Quando o avaliador reprova, o pipeline envia o diagnóstico + crítica de volta ao nó generate para auto-correção. Máximo 2 iterações (MAX_ITER=2). 13 testes unitários.
 
 #### Módulo 5: `observability.py` — LangSmith OBS-001
 
@@ -489,7 +492,7 @@ python -c "from crag_pipeline import run_crag; print('OK')"
 
 #### ✅ Phase 2 — Core Intelligence (Concluída)
 - [x] Knowledge Base com 73 incidentes eSocial curados
-- [x] EvaluatorAgent com threshold 80% (ADR-001)
+- [x] Avaliação automática de qualidade com threshold 80% (ADR-001)
 - [x] Reflexion auto-correção (ADR-002)
 - [x] PII scrubbing (CPF/CNPJ/NIS)
 - [x] Logprobs confidence calibration
@@ -498,7 +501,7 @@ python -c "from crag_pipeline import run_crag; print('OK')"
 
 #### ✅ Phase 3 — Production (Concluída)
 - [x] Qdrant Cloud backend (384 dims, all-MiniLM-L6-v2, Cosine)
-- [x] SmartRouter multi-LLM (9 providers, 3 fases)
+- [x] SmartRouter multi-LLM (9 providers, Fase 1 implementada)
 - [x] ResilientLLM circuit breaker (Groq→Claude→GPT)
 - [x] LGPD Mode — Ollama/Gemma4 local inference
 - [x] MCP Server via fastmcp (`eii_query`, `eii_escalate`)
@@ -656,16 +659,19 @@ EII receives the rejected XML, automatically detects personal data, routes to th
 
 ### Detailed Architecture
 
-#### CRAG Pipeline — 6 Agents
+#### CRAG Pipeline — 8 nós LangGraph
 
-| Agent | Function | Design Decision |
-|-------|----------|-----------------|
-| `Retriever` | Vector search in Qdrant (73 items, 384 dims) | Cosine similarity |
-| `RelevanceCheck` | Filters irrelevant docs with LLM judge | Binary grade |
-| `DiagnosticAgent` | Generates root cause + resolution steps | ADR-001 |
-| `EvaluatorAgent` | Evaluates quality on 5 criteria (80% threshold) | ADR-001, 13 tests |
-| `Reflexion` | Auto-corrects if quality < threshold | ADR-002, 13 tests |
-| `HITL Gate` | Blocks resolution without human validation | 3-checkbox mandatory |
+| Node | Function | Design Decision |
+|------|----------|-----------------|
+| `parse` | Parses XML and extracts metadata | — |
+| `router` | Classifies severity and routing decision | — |
+| `retrieve` | Vector search in ChromaDB/Qdrant | Cosine similarity |
+| `grade` | Filters irrelevant docs with LLM judge | Binary grade |
+| `generate` | Generates root cause + resolution steps | ADR-001 |
+| `evaluate` | Evaluates quality on 5 criteria (80% threshold) | ADR-001, 13 tests |
+| `reflexion` | Auto-corrects if quality < threshold | ADR-002, 13 tests |
+| `finalize` | Applies confidence gate and consolidates result | ADR-001 |
+| `intel` | Proactive insights via IntelAgent | — |
 
 #### SmartRouter — 9 LLM Providers
 
@@ -777,7 +783,7 @@ OPENAI_API_KEY=sk-...                 # Optional (fallback)
 | Phase | Status | Deliverables |
 |-------|--------|-------------|
 | **1 — Foundation** | ✅ Done | Gradio UI + Docker + HF Spaces |
-| **2 — Core Intelligence** | ✅ Done | 73-item KB + CRAG + EvaluatorAgent + Reflexion |
+| **2 — Core Intelligence** | ✅ Done | 73-item KB + CRAG + avaliação automática + reflexão |
 | **3 — Production** | ✅ Done | Qdrant + SmartRouter + MCP + Batch + LGPD |
 | **4 — Deep Agents** | 🔄 In Progress | `create_deep_agent` + async Fork-Join Lote |
 | **5 — Observability** | ⏳ Planned | LangSmith dashboards + S3 + IntelAgent |

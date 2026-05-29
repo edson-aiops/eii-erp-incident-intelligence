@@ -89,11 +89,12 @@ parse_node → router_node → retrieve_node → generate_node
 - KB001-KB073: eSocial (S-1000 a S-2240, erros E001-E529)
 - KB074-KB093: EFD-Reinf (R-1000, R-2010/2020/2050/2060, R-2098/2099, R-4010/4020/4040/4080/4099, R-9001)
 
-### SmartRouter (9 LLMs)
+### SmartRouter (9 providers configurados, ~6 LLMs distintos)
 
 Roteamento automatico por tarefa e disponibilidade:
 - Groq (Llama 3.1 8b, Llama 3.3 70b)
-- Qwen, Cerebras, Moonshot, Mistral, Google AI
+- Cerebras, Mistral, Google AI, Anthropic (Claude)
+- Kimi / Qwen / DeepSeek (aliases que usam API Groq)
 - Ollama (local, ativado via checkbox LGPD)
 
 ### Autenticacao (app.py)

@@ -46,7 +46,7 @@ O EII vive em **um único repositório** mas serve **dois públicos diferentes**
 | **Python** | 3.11 (Codespace) ou 3.13 (PC) | 3.13 (HF Docker) |
 | **Autenticação** | ✅ Login (edson.oliveira) + senha | ❌ Acesso aberto |
 | **Pipeline** | CRAG completo + Deep Agents v0.5 | Chamada Groq direta |
-| **LLM Backend** | SmartRouter (9 LLMs) + Ollama opcional | `llama-3.1-8b-instant` (Groq) |
+| **LLM Backend** | SmartRouter (9 providers, ~6 LLMs distintos) + Ollama opcional | `llama-3.1-8b-instant` (Groq) |
 | **Modo Mentor + HITL** | ✅ Disponível | ❌ Removido |
 | **Roteamento LGPD** | ✅ Forçar Local (Ollama) | ❌ Não tem |
 | **Observabilidade** | LangSmith `@traceable` | Nenhuma |

@@ -413,7 +413,7 @@ Gere um diagnóstico técnico preciso em JSON. Responda APENAS com o JSON, sem t
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 4 — EvaluatorAgent (Evaluator-Optimizer pattern)
+# Step 4 — Evaluation node (Evaluator-Optimizer pattern)
 # ─────────────────────────────────────────────────────────────────────────────
 
 MAX_EVAL_ITERATIONS      = 2

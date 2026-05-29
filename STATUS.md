@@ -21,9 +21,9 @@
 | `app.py` (local) | Funcionando | v3.0.1 — tema Default, CSS legível, SmartRouter Groq ativo |
 | `app_hf.py` (publico) | Funcionando | versao demo minima para HuggingFace |
 | `crag_pipeline.py` | Funcionando | CRAG completo com logprobs |
-| `smartrouter/` | Funcionando | 9 LLMs roteados |
+| `smartrouter/` | Funcionando | 9 providers configurados (~6 LLMs distintos; Kimi/Qwen/DeepSeek compartilham API Groq) |
 | `xml_parser.py` | Funcionando | 4 formatos eSocial + PII scrub |
-| `knowledge_base.py` | Funcionando | 20 incidentes documentados |
+| `knowledge_base.py` | Funcionando | 93 incidentes documentados (eSocial + EFD-Reinf) |
 | `mcp_server.py` | Funcionando | fastmcp stdio |
 | `eii_handlers.py` | Funcionando | handlers puros sem Gradio |
 | `secure_secrets.py` | Funcionando | Windows Credential Manager |
@@ -90,7 +90,7 @@
 - [x] Gradio UI com tabs: Diagnostico, Aprovacao HITL, Log de Auditoria, Arquitetura
 - [x] XML Parser — 4 formatos eSocial
 - [x] CRAG Pipeline — Retrieve > Grade > Generate
-- [x] Knowledge Base — 20 incidentes documentados
+- [x] Knowledge Base — 93 incidentes documentados (eSocial + EFD-Reinf)
 - [x] Docker + HuggingFace Spaces deploy
 - [x] Tema dark IBM Plex Mono/Sans
 
@@ -108,14 +108,14 @@
 
 ### Fase 3 — Production [CONCLUIDA] `v2.2`
 
-- [x] SmartRouter — 9 LLMs (Groq, Qwen, Cerebras, Moonshot, Mistral, Google AI, Ollama)
+- [x] SmartRouter — 9 providers configurados (Groq, Cerebras, Mistral, Google AI, Anthropic, Ollama; Kimi/Qwen/DeepSeek usam API Groq)
 - [x] MCP Server — fastmcp expondo `eii_query` e `eii_escalate`
 - [x] eii_handlers.py — camada pura Python sem Gradio para uso pelo MCP
 - [x] Autenticacao local — login com hash SHA-256, session token, rate limit, timeout
 - [x] Modo Mentor — checklist HITL didatico para analistas juniores
 - [x] Modo Dual — `app.py` (local/interno) vs `app_hf.py` (publico/vitrine)
 - [x] Encoding fix Windows — UTF-8 forcado no terminal
-- [x] EvaluatorAgent — avaliacao automatica de qualidade do diagnostico
+- [x] Avaliacao automatica de qualidade do diagnostico (nó evaluate do pipeline CRAG)
 - [x] Batch Processor — analise paralela de multiplos XMLs
 - [x] **fix(auth): fallback ctypes para Windows Credential Manager** ← FEITO 2026-05-08
 - [x] **fix(smartrouter): qwen-qwq-32b descontinuado substituido** ← FEITO 2026-05-09
@@ -127,7 +127,7 @@
 ### Fase 4 — Deep Agents [CONCLUIDA] `v2.3`
 
 - [x] SmartRouter v2 — refatoracao modular em `smartrouter_v2/` (produzido pelo Qwen, revisado)
-- [x] Deep Agents pipeline — LangGraph StateGraph 7 nos implementados em `src/deep_agents/`
+- [x] Deep Agents pipeline — LangGraph StateGraph 8 nos implementados em `src/deep_agents/` (parse, router, retrieve, generate, evaluate, reflexion, finalize, intel)
 - [x] IntelAgent — agente de inteligencia proativa em `src/intel_agent/`
 - [x] Integracao com sistema ERP/HCM real via API — REST API FastAPI em `api.py`
 - [x] Tela de admin — painel admin em aba dedicada (Sessoes, Estatisticas, Alterar Senha)
@@ -265,7 +265,7 @@ for k in ['GROQ_API_KEY','EII_ADMIN_USER','EII_ADMIN_PASS','QDRANT_API_KEY']:
 | 2026-05-08 | `cmdkey` descartado como metodo de armazenamento | blob DOMAIN_PASSWORD e inacessivel a aplicacoes por design do Windows |
 | 2026-05-08 | `secure_secrets.py set` como padrao para secrets | armazena como CRED_TYPE_GENERIC, legivel pelo app |
 | mai/2026 | Modo Dual app.py vs app_hf.py | separar versao interna (auth/dados reais) da vitrine publica |
-| mai/2026 | SmartRouter com 9 LLMs | resiliencia e custo: rotear por tarefa, nao usar 70B pra tudo |
+| mai/2026 | SmartRouter com 9 providers configurados | resiliencia e custo: rotear por tarefa, nao usar 70B pra tudo |
 | mai/2026 | SQLite para audit trail | persistencia sem dependencia externa, portavel |
 | mai/2026 | Logprobs para confianca | mais confiavel que o LLM auto-reportar confianca no JSON |
 

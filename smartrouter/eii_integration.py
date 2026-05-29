@@ -1,21 +1,21 @@
 """SmartRouter — EII Integration Helpers.
 
 Pre-configured :class:`~smartrouter.adapter.SmartRouterLLM` instances for
-each EII agent role. All instances share a single :class:`~smartrouter.router.SmartRouter`
+each EII pipeline role. All instances share a single :class:`~smartrouter.router.SmartRouter`
 so the circuit breaker state is unified across the entire pipeline — if
-DeepSeek trips during DiagnosticAgent, Kimi takes over immediately for
+DeepSeek trips during the diagnostic step, Kimi takes over immediately for
 the next call without repeating failed attempts.
 
-Agent → TaskType mapping
-------------------------
+Pipeline role → TaskType mapping
+--------------------------------
 +------------------+----------------+----------------------------------+
-| EII Agent        | TaskType       | Primary Provider                 |
+| Pipeline Role    | TaskType       | Primary Provider                 |
 +==================+================+==================================+
-| DiagnosticAgent  | deep_reasoning | DeepSeek R1 (chain-of-thought)  |
-| EvaluatorAgent   | validation     | Cerebras (ultra-fast, 3k tok/s) |
-| EscalationAgent  | general        | Groq (balanced speed/quality)   |
-| IngestAgent      | sensitive_data | Ollama local (data stays local) |
-| Mentor mode      | iteration      | Groq (fast drafts)              |
+| diagnostic       | deep_reasoning | DeepSeek R1 (chain-of-thought)  |
+| evaluator        | validation     | Cerebras (ultra-fast, 3k tok/s) |
+| escalation       | general        | Groq (balanced speed/quality)   |
+| ingest           | sensitive_data | Ollama local (data stays local) |
+| mentor           | iteration      | Groq (fast drafts)              |
 +------------------+----------------+----------------------------------+
 
 Usage::

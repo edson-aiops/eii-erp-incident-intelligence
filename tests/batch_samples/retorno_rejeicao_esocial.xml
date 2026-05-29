@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<retornoEvento xmlns="http://www.esocial.gov.br/schema/evt/retornoEvento/v_S_01_03_00">
+  <ideTransmissor>
+    <IdTransmissor>12345678901234</IdTransmissor>
+  </ideTransmissor>
+  <status>
+    <cdResposta>401</cdResposta>
+    <descResposta>Erro na validacao do evento</descResposta>
+    <versaoSistema>11.5.0</versaoSistema>
+    <dtaResposta>2026-05-25T22:56:00-03:00</dtaResposta>
+  </status>
+  <processamento>
+    <cdResposta>2</cdResposta>
+    <descResposta>Evento rejeitado</descResposta>
+    <versaoAppProcessamento>11.5.0</versaoAppProcessamento>
+    <dtaProcessamento>2026-05-25T22:56:01-03:00</dtaProcessamento>
+    <ocorrencias>
+      <ocorrencia>
+        <codigo>11</codigo>
+        <tipo>1</tipo>
+        <descricao>CNPJ do transmissor diverge do CNPJ do certificado digital</descricao>
+        <localizacao>ideTransmissor</localizacao>
+      </ocorrencia>
+      <ocorrencia>
+        <codigo>525</codigo>
+        <tipo>2</tipo>
+        <descricao>Data do evento posterior a data atual</descricao>
+        <localizacao>ideEvento/perApur</localizacao>
+      </ocorrencia>
+      <ocorrencia>
+        <codigo>545</codigo>
+        <tipo>1</tipo>
+        <descricao>Periodo de apuracao informado em evento nao periodico</descricao>
+        <localizacao>ideEvento/perApur</localizacao>
+      </ocorrencia>
+    </ocorrencias>
+  </processamento>
+  <recibo>
+    <nrRecibo>1.2.0000000000123456789</nrRecibo>
+    <hash>e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</hash>
+    <status>REJEITADO</status>
+  </recibo>
+  <evento>
+    <Id>ID1123456780000002026052500012345678</Id>
+    <nrInsc>12345678000000</nrInsc>
+    <tpInsc>1</tpInsc>
+    <perApur>2026-05</perApur>
+  </evento>
+</retornoEvento>

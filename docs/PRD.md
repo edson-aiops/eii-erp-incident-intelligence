@@ -115,7 +115,7 @@ Um analista humano aprova ou rejeita o diagnóstico antes de qualquer ação ser
 |---|---|---|
 | XML Parser | `xml_parser.py` | Parse multi-formato, PII scrubbing, detecção de evento |
 | CRAG Pipeline | `crag_pipeline.py` | Retrieve → Grade → Generate → Logprobs |
-| Knowledge Base | `knowledge_base.py` | 20 incidentes eSocial documentados |
+| Knowledge Base | `knowledge_base.py` | 93 incidentes documentados (eSocial + EFD-Reinf) |
 | Persistence | `app.py` (`_db_*`) | SQLite: pending queue, decisão, audit log |
 | UI | `app.py` (Gradio) | 4 tabs: Diagnóstico, Aprovação, Audit Log, Arquitetura |
 

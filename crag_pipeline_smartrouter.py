@@ -441,7 +441,7 @@ Gere um diagnóstico técnico preciso em JSON. Responda APENAS com o JSON, sem t
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 4 — EvaluatorAgent (Evaluator-Optimizer pattern)
+# Step 4 — Evaluation node (Evaluator-Optimizer pattern)
 # Uses MODEL_ROUTER (8b) to score the diagnosis against 5 quality criteria.
 # Returns a structured EvalResult that drives the generate→evaluate loop.
 #

@@ -102,10 +102,10 @@ from smartrouter import SmartRouter, TaskType
 
 router = SmartRouter()
 
-# DiagnosticAgent uses deep reasoning
+# Diagnostic role (generate node) uses deep reasoning
 result = await router.route(diagnosis_prompt, force_type=TaskType.DEEP_REASONING)
 
-# EvaluatorAgent uses fast validation
+# Evaluation role (evaluate node) uses fast validation
 result = await router.route(eval_prompt, force_type=TaskType.VALIDATION)
 
 # IntelAgent SourceCollector uses iteration

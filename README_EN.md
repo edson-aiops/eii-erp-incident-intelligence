@@ -54,7 +54,7 @@ Rejected XML
    ┌──┴──┐
 PII?    Clean
  │        │
-Ollama  Groq    ← SmartRouter (3 phases)
+Ollama  Groq    ← SmartRouter (Phase 1: Rules implemented)
 gemma2  Llama 3.3 70B
   └──┬──┘
      │
@@ -70,8 +70,8 @@ gemma2  Llama 3.3 70B
 ```
 
 **CRAG (Corrective RAG):** retrieves documents from vector KB → LLM evaluates relevance →
-generates diagnosis with filtered context → EvaluatorAgent validates quality (80% threshold) →
-Reflexion auto-corrects if necessary.
+generates diagnosis with filtered context → evaluate node validates quality (80% threshold) →
+reflexion auto-corrects if necessary.
 
 ---
 
@@ -162,8 +162,8 @@ Available tools: `eii_query(xml)` and `eii_escalate(incident_id, status, notes)`
 
 - [x] Base CRAG pipeline with ChromaDB
 - [x] KB with 73 curated eSocial incidents
-- [x] EvaluatorAgent (80% threshold) + Reflexion auto-correction
-- [x] SmartRouter multi-LLM (9 providers, 3 phases)
+- [x] Automatic quality evaluation (80% threshold) + Reflexion auto-correction
+- [x] SmartRouter multi-LLM (9 providers, Phase 1 implemented)
 - [x] ResilientLLM circuit breaker (Groq → Claude → GPT)
 - [x] Automatic LGPD routing (PII → Ollama local)
 - [x] MCP Server via fastmcp

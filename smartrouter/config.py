@@ -69,7 +69,7 @@ PROVIDERS: dict[str, ProviderConfig] = {
         base_url="https://api.groq.com/openai/v1",
         model="llama-3.3-70b-versatile",
         api_key_env="GROQ_API_KEY",
-        timeout_seconds=15.0,
+        timeout_seconds=30.0,
     ),
     ProviderID.MISTRAL: ProviderConfig(
         id=ProviderID.MISTRAL,

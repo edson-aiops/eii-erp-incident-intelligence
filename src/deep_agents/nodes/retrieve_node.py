@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Dict, Any
 from src.deep_agents.state import AgentState, RetrievedKnowledge
 
@@ -25,6 +26,17 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
         for o in ocorrencias[:3]
     )
     query = " ".join(filter(None, [context.evento, context.codigo_erro, ocorrencias_txt]))
+
+    # Fallback: se evento desconhecido, enriquecer query com tags do XML bruto
+    if context.evento in ("DESCONHECIDO", "PARSE_ERROR"):
+        xml_raw = getattr(context, "xml_raw", "") or ""
+        # Extrai tags relevantes do XML (ex: evtAdmissao, codCateg, tpRegTrab)
+        tags = re.findall(r"<([a-zA-Z][a-zA-Z0-9]+)>", xml_raw[:800])
+        stopwords = {"xml", "eSocial", "ideEvento", "ideEmpregador", "idePeriodo",
+                     "ideVinculo", "infoEmpregador", "infoEmpregado"}
+        tag_terms = " ".join(dict.fromkeys(t for t in tags if t not in stopwords))
+        query = " ".join(filter(None, [tag_terms, context.codigo_erro]))
+        logger.info("retrieve_node: enriched query (event unknown) = %r", query[:120])
 
     backend = state.get("retrieval_backend", "chromadb")
 

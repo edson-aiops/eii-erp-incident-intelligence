@@ -199,7 +199,95 @@ _EFDREINF_EVT_TAGS = {
 }
 
 
+# Mapa nome do evento (extraído do namespace) → código eSocial.
+# Nomes extraídos do padrão oficial de namespaces do eSocial:
+#   http://www.esocial.gov.br/schema/evt/<evtNome>/v_S_01_03_00
+# A versão (v_*) é ignorada — o mapeamento funciona em qualquer versão do leiaute.
+_ESOCIAL_NS_EVENTS: dict[str, str] = {
+    "evtInfoEmpregador": "S-1000",
+    "evtTabEstab": "S-1005",
+    "evtTabRubrica": "S-1010",
+    "evtTabLotacao": "S-1020",
+    "evtTabCargo": "S-1030",
+    "evtTabCarreira": "S-1035",
+    "evtTabFuncao": "S-1040",
+    "evtTabHorTur": "S-1050",
+    "evtTabAmbiente": "S-1060",
+    "evtTabProcesso": "S-1070",
+    "evtTabOperPort": "S-1080",
+    "evtRemun": "S-1200",
+    "evtRmnRPPS": "S-1202",
+    "evtBenPrRP": "S-1207",
+    "evtPgtos": "S-1210",
+    "evtAqProd": "S-1250",
+    "evtComProd": "S-1260",
+    "evtContratAvNP": "S-1270",
+    "evtInfoComplPer": "S-1280",
+    "evtTotConting": "S-1295",
+    "evtFechaEvPer": "S-1299",
+    "evtCadInicial": "S-2100",
+    "evtAltCadastral": "S-2105",
+    "evtAdmissao": "S-2200",
+    "evtAltContratual": "S-2205",
+    "evtCE": "S-2206",
+    "evtCAT": "S-2210",
+    "evtMonit": "S-2220",
+    "evtToxic": "S-2221",
+    "evtAfastTemp": "S-2230",
+    "evtCessao": "S-2231",
+    "evtExpRisco": "S-2240",
+    "evtInsApo": "S-2241",
+    "evtTreiCap": "S-2245",
+    "evtAvPrevio": "S-2250",
+    "evtConvInterm": "S-2260",
+    "evtReintegr": "S-2298",
+    "evtDeslig": "S-2299",
+    "evtTSVInicio": "S-2300",
+    "evtTSVAltContr": "S-2306",
+    "evtTSVTermino": "S-2399",
+    "evtCdBenefIn": "S-2400",
+    "evtCdBenefAlt": "S-2405",
+    "evtCdBenIn": "S-2410",
+    "evtCdBenAlt": "S-2416",
+    "evtReativBen": "S-2418",
+    "evtCdBenTerm": "S-2420",
+    # Rótulos de família para eventos que compartilham o mesmo nome de namespace
+    # (não há desambiguação simples no XML de envio — o namespace é idêntico)
+    "evtExclusao": "S-2500/S-2501/S-3000",
+    "evtBasesTrab": "S-5001",
+    "evtIrrf": "S-5002",
+    "evtBasesFGTS": "S-5003",
+    "evtCS": "S-5011",
+    "evtIrrfBenef": "S-5012",
+    "evtFGTS": "S-5013",
+    "evtTribProcTrab": "S-5501/S-5502/S-5503",
+    "evtAgNoc": "S-5511/S-5512/S-5513",
+}
+
+
 def _detect_event_type(xml_str: str, root: ET.Element) -> str:
+    # 0. eSocial: extrai evento do namespace do schema (mais confiável que busca textual)
+    #    Namespace: http://www.esocial.gov.br/schema/evt/<evtNome>/v_S_01_03_00
+    ns = ""
+    if root.tag.startswith("{"):
+        ns = root.tag[1:].split("}")[0]
+    else:
+        # Fallback: procura xmlns no XML bruto
+        m = re.search(r'xmlns="([^"]+)"', xml_str)
+        if m:
+            ns = m.group(1)
+    if ns:
+        # Extrai o segmento após "/evt/" e antes da versão (v_*)
+        parts = ns.split("/")
+        for i, part in enumerate(parts):
+            if part == "evt" and i + 1 < len(parts):
+                evt_name = parts[i + 1]
+                # Remove sufixo de versão se colado (ex: evtAdmissao/v02_05_00)
+                evt_name = evt_name.split("/")[0]
+                if evt_name in _ESOCIAL_NS_EVENTS:
+                    return _ESOCIAL_NS_EVENTS[evt_name]
+                break
+
     # 1. EFD-Reinf: procura tags de evento específicas (evtServTom, evtCPRB, etc.)
     for evt, tag in _EFDREINF_EVT_TAGS.items():
         if tag in xml_str:

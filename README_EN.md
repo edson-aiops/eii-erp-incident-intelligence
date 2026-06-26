@@ -199,13 +199,15 @@ Available tools: `eii_query(xml)` and `eii_escalate(incident_id, status, notes)`
 
 ---
 
-## 👨‍💻 Developer
+## 👤 Author
 
-*Edson Oliveira · Senior IT Systems Analyst · 12+ years in HCM/ERP*  
-*AI applied to compliance and HR operations in Brazil*
+Edson Oliveira — Senior IT Systems Analyst transitioning to AI Agentic Engineering
+- LinkedIn: edson-pereira-oliveira
+- GitHub: edson-aiops
+- HuggingFace: EdsonPO
 
-[![GitHub](https://img.shields.io/badge/GitHub-eii--erp--incident--intelligence-181717?style=for-the-badge&logo=github)](https://github.com/edson-aiops/eii-erp-incident-intelligence)  
-[![HuggingFace](https://img.shields.io/badge/🤗_HuggingFace-eii--erp--incident--intelligence-FFD21E?style=for-the-badge)](https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence)
+12+ years in HCM, payroll, and corporate ERP.
+Portfolio project applied to Business Systems / Information Systems Analyst profiles.
 
 ---
 

@@ -214,13 +214,13 @@ Antes de contribuir, leia `WORKFLOW.md` para entender o fluxo de branches e comm
 
 ## 👤 Autor
 
-**Edson Oliveira** — Senior IT Systems Analyst em transição para AI Agentic Engineering
+Edson Oliveira — Senior IT Systems Analyst em transição para AI Agentic Engineering
+- LinkedIn: edson-pereira-oliveira
+- GitHub: edson-aiops
+- HuggingFace: EdsonPO
 
-- LinkedIn: [edson-pereira-oliveira](https://www.linkedin.com/in/edson-pereira-oliveira)
-- GitHub: [edson-aiops](https://github.com/edson-aiops)
-- HuggingFace: [EdsonPO](https://huggingface.co/EdsonPO)
-
-12+ anos em HCM, folha de pagamento e ERP corporativo. Projeto de portfólio aplicado a perfis de Business Systems / Information Systems Analyst.
+12+ anos em HCM, folha de pagamento e ERP corporativo.
+Projeto de portfólio aplicado a perfis de Business Systems / Information Systems Analyst.
 
 ---
 

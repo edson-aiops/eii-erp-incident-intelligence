@@ -22,8 +22,7 @@ short_description: Diagnostico eSocial e EFD-Reinf com CRAG e HITL
 [![Open in Spaces](https://img.shields.io/badge/🤗-Open%20in%20Spaces-yellow)](https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence)
 [![🇺🇸 English version → README_EN.md](https://img.shields.io/badge/🇺🇸-English%20version-3776AB.svg)](README_EN.md)
 
-<!-- TODO: adicionar demo.gif -->
-<!-- ![EII Demo](assets/demo.gif) -->
+![EII Demo](assets/demo.gif)
 
 ---
 

@@ -11,7 +11,7 @@
 [![Open in Spaces](https://img.shields.io/badge/🤗-Open%20in%20Spaces-yellow)](https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence)
 [![🇧🇷 Versão em Português → README.md](https://img.shields.io/badge/🇧🇷-Versão%20em%20Português-009B7D.svg)](README.md)
 
-![EII Demo](assets/demo.gif)
+![EII Demo](https://raw.githubusercontent.com/edson-aiops/eii-erp-incident-intelligence/58a6de1/assets/demo.gif)
 
 ---
 

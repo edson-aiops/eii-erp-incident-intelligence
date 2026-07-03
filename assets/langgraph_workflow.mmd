@@ -1,0 +1,29 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	parse(parse)
+	router(router)
+	retrieve(retrieve)
+	generate(generate)
+	evaluate(evaluate)
+	reflexion(reflexion)
+	finalize(finalize)
+	intel(intel)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> parse;
+	evaluate -.-> finalize;
+	evaluate -.-> reflexion;
+	finalize --> intel;
+	generate --> evaluate;
+	parse --> router;
+	reflexion --> generate;
+	retrieve --> generate;
+	router --> retrieve;
+	intel --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

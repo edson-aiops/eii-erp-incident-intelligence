@@ -28,3 +28,8 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "smartrouter/tests"]
+addopts = "-q --tb=short"
+asyncio_mode = "strict"

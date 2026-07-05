@@ -10,6 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Open in Spaces](https://img.shields.io/badge/🤗-Open%20in%20Spaces-yellow)](https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence)
 [![🇧🇷 Versão em Português → README.md](https://img.shields.io/badge/🇧🇷-Versão%20em%20Português-009B7D.svg)](README.md)
+[![CI](https://github.com/edson-aiops/eii-erp-incident-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/edson-aiops/eii-erp-incident-intelligence/actions/workflows/ci.yml)
 
 ![EII Demo](https://github.com/edson-aiops/eii-erp-incident-intelligence/releases/download/v3.1/demo.gif)
 

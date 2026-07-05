@@ -14,6 +14,8 @@
 
 ![EII Demo](https://github.com/edson-aiops/eii-erp-incident-intelligence/releases/download/v3.1/demo.gif)
 
+> 🔒 Data shown as `[REDACTED]` is masked **automatically** by the PII scrubbing layer (LGPD/privacy by design) before any LLM call. All XML files in the demo are synthetic.
+
 ---
 
 ## 🤖 What is EII?
@@ -112,6 +114,17 @@ graph TD;
 | **IntelAgent** | Proactive post-diagnosis analysis that surfaces recurrence patterns from recent incidents without extra LLM calls. |
 | **Batch Processor** | Parallel analysis of multiple XML files via `ThreadPoolExecutor`. |
 | **Observability** | Optional LangSmith tracing with structured metadata per node; no-op when not configured. |
+
+### Design targets (PRD)
+
+| Metric | Target (PRD) | Status |
+|---|---|---|
+| eSocial incident MTTR | 70% reduction | 🎯 Target — measurement instrumentation in progress |
+| Auto-resolution rate | ≥ 70% of R-* events | 🎯 Target — benchmark on versioned synthetic dataset planned |
+| HITL escalation | ≤ 30% | 🎯 Target |
+| Test suite | — | ✅ **120 tests green in CI** |
+
+> Targets become results only with real measurements (documented baseline + N).
 
 ---
 

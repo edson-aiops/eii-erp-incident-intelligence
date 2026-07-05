@@ -25,6 +25,8 @@ short_description: Diagnostico eSocial e EFD-Reinf com CRAG e HITL
 
 ![EII Demo](https://github.com/edson-aiops/eii-erp-incident-intelligence/releases/download/v3.1/demo.gif)
 
+> 🔒 Os dados exibidos como `[REMOVIDO]` são mascarados **automaticamente** pela camada de PII scrubbing (LGPD by design) antes de qualquer chamada ao LLM. Todos os XMLs da demonstração são sintéticos.
+
 ---
 
 ## 🤖 O que é o EII?
@@ -123,6 +125,17 @@ graph TD;
 | **IntelAgent** | Análise proativa pós-diagnóstico que identifica padrões recorrentes nos incidentes recentes sem chamadas extras de LLM. |
 | **Batch Processor** | Análise paralela de múltiplos XMLs via `ThreadPoolExecutor`. |
 | **Observabilidade** | Tracing opcional via LangSmith com metadata estruturada por nó; no-op quando não configurado. |
+
+### Metas de design (PRD)
+
+| Métrica | Meta (PRD) | Status |
+|---|---|---|
+| MTTR de incidentes eSocial | Redução de 70% | 🎯 Target — instrumentação em desenvolvimento |
+| Resolução automática | ≥ 70% dos eventos R-* | 🎯 Target — benchmark planejado |
+| Escalonamento HITL | ≤ 30% | 🎯 Target |
+| Suite de testes | — | ✅ **120 testes verdes no CI** |
+
+> Targets viram resultados quando houver medição real (baseline + N documentados).
 
 ---
 

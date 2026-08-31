@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<eSocial xmlns="http://www.esocial.gov.br/schema/evt/evtRemun/v_S_01_03_00">
+  <evtRemun Id="ID1123456780000002025010300000000003">
+    <ideEvento>
+      <indRetif>1</indRetif>
+      <perApur>2025-01</perApur>
+    </ideEvento>
+    <ideEmpregador>
+      <tpInsc>1</tpInsc>
+      <nrInsc>12345678000199</nrInsc>
+    </ideEmpregador>
+    <ideTrabalhador>
+      <cpfTrab>555.666.777-88</cpfTrab>
+      <nisTrab>123.45678.90-1</nisTrab>
+      <nmTrab>JOSE CARLOS FERREIRA</nmTrab>
+    </ideTrabalhador>
+    <dmDev>
+      <ideDmDev>demonstrativo2</ideDmDev>
+      <infoPerApur>
+        <ideEstabLot>
+          <tpInsc>1</tpInsc>
+          <nrInsc>12345678000199</nrInsc>
+          <codLotacao>001</codLotacao>
+          <qtDiasUteis>30</qtDiasUteis>
+          <remunPerApur>
+            <matricula>MAT003</matricula>
+            <itensRemun>
+              <codRubr>101</codRubr>
+              <vrRubr>2000.00</vrRubr>
+            </itensRemun>
+          </remunPerApur>
+        </ideEstabLot>
+      </infoPerApur>
+    </dmDev>
+  </evtRemun>
+</eSocial>

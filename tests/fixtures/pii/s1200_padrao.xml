@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<eSocial xmlns="http://www.esocial.gov.br/schema/evt/evtRemun/v_S_01_03_00">
+  <evtRemun Id="ID1123456780000002025010400000000004">
+    <ideEvento>
+      <indRetif>1</indRetif>
+      <perApur>2025-01</perApur>
+    </ideEvento>
+    <ideEmpregador>
+      <tpInsc>1</tpInsc>
+      <nrInsc>12345678000199</nrInsc>
+    </ideEmpregador>
+    <ideTrabalhador>
+      <cpfTrab>999.888.777-66</cpfTrab>
+      <nisTrab>111.22222.33-4</nisTrab>
+      <nmTrab>ANA BEATRIZ SANTOS</nmTrab>
+    </ideTrabalhador>
+    <dmDev>
+      <ideDmDev>demonstrativo3</ideDmDev>
+      <infoPerApur>
+        <ideEstabLot>
+          <tpInsc>1</tpInsc>
+          <nrInsc>12345678000199</nrInsc>
+          <codLotacao>001</codLotacao>
+          <qtDiasUteis>30</qtDiasUteis>
+          <remunPerApur>
+            <matricula>MAT004</matricula>
+            <itensRemun>
+              <codRubr>101</codRubr>
+              <vrRubr>3000.00</vrRubr>
+            </itensRemun>
+          </remunPerApur>
+        </ideEstabLot>
+      </infoPerApur>
+    </dmDev>
+  </evtRemun>
+</eSocial>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<eSocial xmlns="http://www.esocial.gov.br/schema/evt/evtAdmissao/v_S_01_03_00">
+  <evtAdmissao Id="ID1123456780000002025010200000000002">
+    <ideEvento>
+      <indRetif>1</indRetif>
+      <dtAdm>2025-01-02</dtAdm>
+    </ideEvento>
+    <ideEmpregador>
+      <tpInsc>1</tpInsc>
+      <nrInsc>12345678000199</nrInsc>
+    </ideEmpregador>
+    <trabalhador>
+      <cpfTrab>111.222.333-44</cpfTrab>
+      <nisTrab>987.65432.10-0</nisTrab>
+      <nmTrab>MARIA APARECIDA DA SILVA</nmTrab>
+      <sexo>F</sexo>
+      <racaCor>2</racaCor>
+      <dtNascto>1985-03-15</dtNascto>
+      <endereco>
+        <brasil>
+          <logradouro>RUA DAS FLORES</logradouro>
+          <nrLogradouro>123</nrLogradouro>
+          <cep>12345678</cep>
+        </brasil>
+      </endereco>
+    </trabalhador>
+    <vinculo>
+      <matricula>MAT002</matricula>
+      <tpRegTrab>1</tpRegTrab>
+      <tpRegPrev>1</tpRegPrev>
+      <ctps>
+        <nrCtps>123456</nrCtps>
+        <serieCtps>0001</serieCtps>
+        <ufCtps>SP</ufCtps>
+      </ctps>
+    </vinculo>
+  </evtAdmissao>
+</eSocial>

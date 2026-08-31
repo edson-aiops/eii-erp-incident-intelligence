@@ -1,4 +1,16 @@
-﻿import re
+"""DEPRECATED — mantido apenas para referência histórica.
+
+Este módulo não deve ser usado em novo código. Ele redige CNPJ (pessoa
+jurídica necessária ao diagnóstico) e não possui mapa de reversão,
+ficando incompatível com a PII-SCRUBBER-SPEC.
+
+Use `src.privacy.scrubber` (PIIScrubber / ScrubResult) para todo scrubbing
+obrigatório de PII no pipeline EII.
+
+A remoção deste arquivo será tratada em PR separado com ADR.
+"""
+
+import re
 from typing import Dict
 
 # Padrões de PII (CPF, CNPJ, NIS, Nome)

@@ -212,7 +212,131 @@ seção 7 da spec.
 
 ---
 
-## 11. Itens de decisão / autorização
+## 11. A23 — revisão v2 da seção 3 do PII Scrubber
+
+### 11.1 Diff da revisão
+
+Arquivos alterados:
+
+```text
+docs/PII-SCRUBBER-SPEC.md   (seção 3 substituída pela v2)
+src/privacy/scrubber.py     (implementação v2: allowlist, CLASSIFICAR, GENERALIZAR,
+                             Id condicional a tpInsc, rede de segurança v2)
+```
+
+Arquivos criados:
+
+```text
+tests/test_pii_scrubber_s2200.py   (33 casos → 48 casos após correção de testes)
+```
+
+Arquivos **não** tocados:
+
+```text
+smartrouter/            (fiação continua deferida)
+tests/test_pii_scrubber.py   (15/15 verdes, inalterado)
+```
+
+### 11.2 Saídas dos testes
+
+```text
+$ python -m pytest tests/test_pii_scrubber.py -v
+15 passed
+
+$ python -m pytest tests/test_pii_scrubber_s2200.py -v
+48 passed
+
+$ python -m pytest --tb=short
+183 passed, 19 warnings in 5.29s
+```
+
+Os 19 warnings continuam sendo `DeprecationWarning` de
+`datetime.datetime.utcnow()` em `smartrouter/tests/`, sem relação com esta
+feature.
+
+### 11.3 Campos cobertos vs. seção 3 v2 da spec
+
+| Classe | Campos eSocial | Token / tratamento | Status |
+|---|---|---|---|
+| **TOKENIZAR** | `cpfTrab`, `cpfBenef`, `cpfResp`, `cpfDep` | `CPF_NNN` | ✅ coberto |
+| | `nmTrab`, `nmSoc`, `nmDep`, `nmMae`, `nmPai` | `NOME_NNN` | ✅ coberto |
+| | `nisTrab` | `NIS_NNN` | ✅ coberto |
+| | `dtNascto` | `DATA_NASC_NNN` | ✅ coberto |
+| | `nrCtps`, `nrRic`, `nrRg`, `nrRne`, `nrOc`, `nrRegCnh`, `nrCnh` | `DOC_NNN` | ✅ coberto |
+| | `fonePrinc`, `foneAlternat` | `FONE_NNN` | ✅ coberto |
+| | `emailPrinc`, `emailAlternat` | `EMAIL_NNN` | ✅ coberto |
+| | `dscLograd`, `logradouro`, `nrLograd`, `nrLogradouro`, `complemento`, `bairro` | `ENDERECO_NNN` (bloco compartilhado) | ✅ coberto |
+| | `observacao`, `dscSalVar` | `TEXTO_LIVRE_NNN` | ✅ coberto |
+| | `matricula` | `MATR_NNN` | ✅ coberto |
+| | `cnpjSindTrab` | `CNPJ_SIND_NNN` | ✅ coberto |
+| | `nrProcJud`, `nrProcTrab` | `PROC_NNN` | ✅ coberto |
+| **CLASSIFICAR** | `racaCor`, `sexo`, `estCiv`, `grauInstr` | `<CAMPO>_VALIDO_NNN` / `FORA_DOMINIO_NNN` | ✅ coberto |
+| | `defFisica`, `defVisual`, `defAuditiva`, `defMental`, `defIntelectual`, `reabReadap`, `infoCota` | `<CAMPO>_VALIDO_NNN` / `FORA_DOMINIO_NNN` | ✅ coberto |
+| | `incTrab`, `trabAposent`, `casadoBr`, `filhosBr`, `depIRRF`, `depSF` | `<CAMPO>_VALIDO_NNN` / `FORA_DOMINIO_NNN` | ✅ coberto |
+| | `tpDep`, `classTrabEstrang` | `<CAMPO>_VALIDO_NNN` / `FORA_DOMINIO_NNN` | ✅ coberto |
+| | `paisNascto`, `paisNac`, `paisResid`, `paisResidExt` | `PAIS_BRASIL_NNN` / `PAIS_ESTRANGEIRO_NNN` / `PAIS_FORA_DOMINIO_NNN` | ✅ coberto |
+| **GENERALIZAR** | `vrRubr`, `vrBcCp`, `vrSalFx`, `vrDedDep`, `vrCpSeg` | `VALOR_FAIXA_<lower>_<upper>` | ✅ coberto |
+| | `cep` | `CEP_VALIDO_NNN` / `CEP_FORA_FORMATO_NNN` | ✅ coberto |
+| **PRESERVAR** | `tpInsc`, `tpAmb`, `indRetif`, `codCateg`, `CBOCargo`, `CBOFunc`, `tpRegTrab`, `tpRegPrev`, `tpAdmissao`, `indAdmissao`, `cnpjSindCategProf`, `cnpjEmpregador`, `cnpjTransf`, `cnpjSucessora`, `dtAdm`, `dtDeslig`, `dtOpcFGTS`, `cdResposta`, `codigo`, `nrRecibo`, `nrRec`, `nrRecArqBase`, `nrRecInfPrelim`, `nrProtocolo`, `hash` | mantido | ✅ coberto |
+| **Id do evento** | atributo `Id` (36 posições) | preserva largura; CPF do empregador tokenizado quando `tpInsc=2/3` | ✅ coberto |
+| **Allowlist de bloco de titular** | campos dentro de `trabalhador`, `dependente`, `endereco`, `documentos`, `contato`, `infoDeficiencia`, `aposentadoria`, `trabEstrangeiro`, `filiacaoSindical` sem regra explícita | `CAMPO_TITULAR_NNN` | ✅ coberto |
+| **Rede de segurança v2** | regex CPF/PIS, run de dígitos ≥11, eco de valores em texto livre de retorno | `is_safe_for_remote=False` quando ativada | ✅ coberto |
+
+Divergências: nenhuma.
+
+### 11.4 Blast radius
+
+- **Pipeline de diagnóstico:** `is_safe_for_remote=False` força degradação para
+  Qwen 14B local (fail-closed). Nenhum dado pessoal vaza para OpenRouter/GLM.
+- **CRAG/retrieval:** a busca passa a usar payload já limpo; falhas no scrubber
+  podem contaminar o contexto enviado ao LLM local ou, no pior caso, ao remoto
+  se a camada de segurança também falhar.
+- **SmartRouter:** ainda não integrado (depende dos greps do servidor). A
+  fiação continua deferida.
+- **Testes existentes:** nenhum impacto — suíte completa continua verde.
+
+### 11.5 Rollback path
+
+Mesmo da seção 7, com acréscimo:
+
+- Reverter a revisão v2 significa perder a cobertura de dados sensíveis do
+  S-2200 (`racaCor`, `infoDeficiencia`, etc.) e a pseudonimização do CPF no
+  `Id` quando `tpInsc != 1`.
+- Se necessário, o rollback pode ser feito commit-a-commit, mantendo a v1 do
+  scrubber em `src/privacy/scrubber.py` e removendo
+  `tests/test_pii_scrubber_s2200.py`.
+
+### 11.6 Métrica de performance
+
+**Sem métrica de performance nova.** O overhead de parsing XML e das três
+passadas de scrubbing continua esperado como irrisório frente à chamada de LLM.
+
+### 11.7 Correção de teste pelo autor
+
+Os testes `test_campos_classificados_sao_reversiveis`,
+`test_scrub_com_dados_sensiveis_e_deterministico` e
+`test_token_map_nunca_aparece_no_payload_do_s2200` foram corrigidos pelo
+autor da spec, após escalacao do Kimi, antes da primeira execucao verde.
+Nenhum deles existia em main. A implementacao NAO foi ajustada para
+acomoda-los: os dois primeiros tinham erro de chamada (argumento
+obrigatorio omitido) e o terceiro asseria um invariante impossivel de
+satisfazer sob o esquema de tokens exigido pela propria spec.
+`test_pais_fora_do_formato_nao_e_tratado_como_estrangeiro_valido` e teste
+novo, cobrindo defeito de implementacao contra a secao 3.3.2 encontrado
+na revisao do diff.
+
+### 11.8 Limitação registrada
+
+A verificacao de nao-vazamento de campos CLASSIFICADOS e feita caso a caso
+(secao 1 do arquivo de testes), nao por varredura generica sobre token_map.
+Motivo: dominios de 1 e 2 caracteres colidem por acaso com qualquer esquema
+de token legivel. Uma varredura que soubesse distinguir colisao de vazamento
+precisaria conhecer o vocabulario de tokens da implementacao, o que
+quebraria a autoria black-box (D9).
+
+---
+
+## 12. Itens de decisão / autorização (v1 + A23)
 
 | # | Item | Decisão | Quem |
 |---|---|---|---|
@@ -220,19 +344,24 @@ seção 7 da spec.
 | 2 | Regex de CPF/PIS com falsos positivos em CNPJ | Aplicar lookarounds `(?<!\d)` e `(?!\d)` nos testes e na rede de segurança | Edson autorizou em 31/08 |
 | 3 | Remoção de `src/utils/scrubber.py` | Deferir para PR separado com ADR | Edson instruiu em 31/08 |
 | 4 | Integração no SmartRouter | Deferir após greps do servidor | Edson instruiu em 31/08 |
+| 5 | Correção de testes s2200 com argumento omitido e assert ingênuo | Corrigir pelo autor da spec antes do merge | Edson autorizou em 31/08 |
+| 6 | `PAIS_FORA_DOMINIO` para país fora do formato de 3 dígitos | Restaurar estado com validação de formato, não de tabela | Edson autorizou em 31/08 |
+| 7 | Strip de valores e não tokenizar texto vazio/whitespace | Ratificar na implementação e na seção 3.6 da spec | Edson ratificou em 31/08 |
 
 ---
 
-## 12. Veredito
+## 13. Veredito
 
-- [x] 15 testes novos passam
-- [x] 135 testes da suíte completa passam (sem regressão)
+- [x] 15 testes de `tests/test_pii_scrubber.py` passam
+- [x] 48 testes de `tests/test_pii_scrubber_s2200.py` passam
+- [x] 183 testes da suíte completa passam (sem regressão)
 - [x] Nenhum teste existente alterado para passar
-- [x] Campos cobertos alinhados à seção 3 da spec
+- [x] Campos cobertos alinhados à seção 3 v2 da spec
 - [x] Código morto identificado e marcado como deprecado
 - [x] Testes de integração deferidos documentados
+- [x] Correção de testes documentada no evidence pack
 - [x] Sem push realizado
 
 **Veredito:** Pronto para revisão de Edson.
 
-Assinado: ___________________________  Edson  —  2026-08-31
+Assinado:Edson — 2026-08-31

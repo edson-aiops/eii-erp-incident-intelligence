@@ -9,8 +9,8 @@
 ## Onde Estamos Agora
 
 **Versao atual:** v3.1 (local) | v3.0 (HuggingFace publico)
-**Data de referencia:** 2026-05-09
-**Branch ativa:** `main`
+**Data de referencia:** 2026-08-31
+**Branch ativa:** `feature/claude-mandatory-pii-scrubber`
 **App local rodando:** http://127.0.0.1:7860
 **App publico (HF):** https://huggingface.co/spaces/EdsonPO/eii-erp-incident-intelligence
 
@@ -34,6 +34,7 @@
 | `src/intel_agent/` | Funcionando | analise proativa pos-diagnostico (Phase 4) |
 | `api.py` | Funcionando | REST API FastAPI para integracao ERP/HCM |
 | `src/` | Em desenvolvimento | estrutura modular futura |
+| `src/privacy/scrubber.py` | Funcionando | PII Scrubber obrigatório v2 — S-2200, Id condicional a tpInsc, rede de segurança v2 |
 
 ### Agentes ativos no projeto
 
@@ -260,6 +261,7 @@ for k in ['GROQ_API_KEY','EII_ADMIN_USER','EII_ADMIN_PASS','QDRANT_API_KEY']:
 
 | Data | Decisao | Motivo |
 |---|---|---|
+| 2026-08-31 | **PII Scrubber v2 — revisão A23 da seção 3 da spec** | allowlist em blocos de titular, classes TOKENIZAR/CLASSIFICAR/GENERALIZAR, Id/nrInsc condicional a tpInsc, rede de segurança v2; 48 testes s2200 + 15 testes v1 + suíte completa 183 verdes |
 | 2026-05-19 | **Integrar Kimi K2.6 ao protocolo multi-agente** | 262K contexto para análise de estado, MCP nativo, open-weight, complementa Claude/Qwen |
 | 2026-05-08 | `_read_wincred()` via ctypes em vez de depender so do keyring | keyring nao le credenciais salvas via cmdkey (DOMAIN_PASSWORD tem blob vazio) |
 | 2026-05-08 | `cmdkey` descartado como metodo de armazenamento | blob DOMAIN_PASSWORD e inacessivel a aplicacoes por design do Windows |
@@ -271,6 +273,6 @@ for k in ['GROQ_API_KEY','EII_ADMIN_USER','EII_ADMIN_PASS','QDRANT_API_KEY']:
 
 ---
 
-**Ultima atualizacao:** 2026-05-19 (v3.1 — adicionado Kimi K2.6 ao protocolo multi-agente)
+**Ultima atualizacao:** 2026-08-31 (v3.1 — PII Scrubber v2 entregue na branch `feature/claude-mandatory-pii-scrubber`)
 **Autor:** Edson Oliveira
 **Mantido por:** obrigatorio — qualquer mudanca no projeto atualiza este arquivo

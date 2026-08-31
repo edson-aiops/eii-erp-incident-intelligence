@@ -9,6 +9,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **feat(privacy): PII Scrubber obrigatório v2 — revisão A23 da seção 3 da spec**
+  - `src/privacy/scrubber.py` reescrito com allowlist dentro de blocos de titular
+    (`trabalhador`, `dependente`, `endereco`, `contato`, `infoDeficiencia`, etc.).
+  - Três classes de tratamento: `TOKENIZAR` (CPF, nome, NIS, etc.),
+    `CLASSIFICAR` (domínios discretos como `racaCor`, `sexo`, `estCiv`,
+    `grauInstr`, deficiências, países) e `GENERALIZAR` (valores monetários em
+    faixas, CEP em valido/invalido).
+  - Pseudonimização do CPF do empregador no atributo `Id` e na tag `nrInsc`
+    quando `tpInsc=2` ou `tpInsc=3`, preservando largura 36 do `Id`.
+  - Rede de segurança v2: regexes CPF/PIS com lookarounds, run de dígitos ≥11
+    com lista de isenção, e substituição de valores reais em texto livre de
+    retorno (`descResposta`, `descricao`, `motivo`).
+  - `tests/test_pii_scrubber_s2200.py` (48 casos) cobrindo dados sensíveis do
+    S-2200, quasi-identificadores, dependente, contato, `Id`/`nrInsc`
+    condicional a `tpInsc`, rede de segurança v2 e reversibilidade.
+  - Decisões registradas: strip de valores antes do `token_map`; campos vazios
+    ou whitespace puro não são tokenizados; `PAIS_FORA_DOMINIO` restaurado
+    para países fora do formato de 3 dígitos (validação de formato, não de
+    tabela). Ver `EVIDENCE_PACK-scrubber.md` seção 11.
+
 - **docs(agents): integrar Kimi K2.6 ao protocolo multi-agente**
   - `AGENTS.md` v1.1 — adicionado Kimi K2.6 na tabela de agentes, regras de convivência,
     fluxo padrão, cenários reais, e mapa de arquivos de coordenação

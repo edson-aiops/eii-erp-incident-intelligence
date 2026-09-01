@@ -27,9 +27,9 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
     )
     query = " ".join(filter(None, [context.evento, context.codigo_erro, ocorrencias_txt]))
 
-    # Fallback: se evento desconhecido, enriquecer query com tags do XML bruto
+    # Fallback: se evento desconhecido, enriquecer query com tags do payload limpo
     if context.evento in ("DESCONHECIDO", "PARSE_ERROR"):
-        xml_raw = getattr(context, "xml_raw", "") or ""
+        xml_raw = state.get("scrubbed_payload", state.get("payload", "")) or getattr(context, "xml_raw", "") or ""
         # Extrai tags relevantes do XML (ex: evtAdmissao, codCateg, tpRegTrab)
         tags = re.findall(r"<([a-zA-Z][a-zA-Z0-9]+)>", xml_raw[:800])
         stopwords = {"xml", "eSocial", "ideEvento", "ideEmpregador", "idePeriodo",

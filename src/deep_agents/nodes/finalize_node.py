@@ -1,12 +1,13 @@
 import logging
 from typing import Dict, Any
 from src.deep_agents.state import AgentState
+from src.privacy.scrubber import PIIScrubber
 
 logger = logging.getLogger(__name__)
 
 
 async def finalize_node(state: AgentState) -> Dict[str, Any]:
-    """Applies logprobs confidence gate (ADR-001) and builds the final result dict."""
+    """Applies logprobs confidence gate (ADR-001), restores PII tokens and builds the final result dict."""
     from crag_pipeline import confidence_score, _KB_HASH
     from xml_parser import parse_esocial_xml
 
@@ -14,6 +15,16 @@ async def finalize_node(state: AgentState) -> Dict[str, Any]:
     diagnosis = dict(state.get("diagnosis") or {})
     incident_id = state.get("incident_id", "UNKNOWN")
     iteration_count = state.get("iteration_count", 0)
+    token_map = state.get("token_map") or {}
+
+    # Restaurar tokens na resposta antes de expor ao usuário
+    if token_map:
+        try:
+            scrubber = PIIScrubber()
+            resposta = diagnosis.get("resposta", "")
+            diagnosis["resposta"] = scrubber.restore(resposta, token_map)
+        except Exception as e:
+            logger.warning("finalize_node: restore failed: %s", e)
 
     # ADR-001: override confianca with logprobs measurement
     logprob_sim = None
@@ -49,6 +60,8 @@ async def finalize_node(state: AgentState) -> Dict[str, Any]:
             "errors": state.get("errors", []),
         },
         "diagnosis_raw": diagnosis,
+        "is_safe_for_remote": state.get("is_safe_for_remote"),
+        "token_map": None,  # garante que o mapa não serializa na saída
     }
 
     logger.info(

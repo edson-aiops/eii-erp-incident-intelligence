@@ -28,6 +28,7 @@ class Diagnosis:
 
 class AgentState(TypedDict):
     xml_input: str
+    payload: Optional[str]                # alias opcional para xml_input (usado pelo scrubber)
     incident_id: str
     use_mentor_mode: bool
     context: Optional[IncidentContext]
@@ -45,3 +46,8 @@ class AgentState(TypedDict):
     warnings: List[str]
     final_result: Optional[Dict[str, Any]]
     proactive_insights: Optional[Dict[str, Any]]
+    # Campos do PIIScrubber (A3)
+    scrubbed_payload: Optional[str]
+    is_safe_for_remote: Optional[bool]
+    token_map: Optional[Dict[str, str]]
+    pii_scrubbed: Optional[bool]

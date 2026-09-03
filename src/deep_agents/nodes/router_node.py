@@ -4,63 +4,35 @@ from src.deep_agents.state import AgentState
 
 logger = logging.getLogger(__name__)
 
-# eSocial events that require deep reasoning (complex payroll/employment impacts)
-_CRITICAL_EVENTS = {
-    "S-1200", "S-2200", "S-2400", "S-2300",
-    "S-5001", "S-5002", "S-5011", "S-5012",
-}
-_HIGH_EVENTS = {"S-2230", "S-2299", "S-3000", "S-5003"}
-
-# Error codes by severity
-_CRITICAL_ERRORS = {"E500", "E001", "E002", "E003", "E428"}
-_HIGH_ERRORS = {"E469", "E214", "E312", "E401"}
-
-
-def _classify_severity(evento: str, codigo_erro: str) -> str:
-    ev = (evento or "").upper()
-    err = (codigo_erro or "").upper()
-
-    if ev == "PARSE_ERROR":
-        return "CRITICAL"
-    if any(e in ev for e in _CRITICAL_EVENTS):
-        return "CRITICAL"
-    if any(e in err for e in _CRITICAL_ERRORS):
-        return "CRITICAL"
-    if any(e in ev for e in _HIGH_EVENTS):
-        return "HIGH"
-    if any(e in err for e in _HIGH_ERRORS):
-        return "HIGH"
-    return "MEDIUM"
-
 
 async def smart_router_node(state: AgentState) -> Dict[str, Any]:
-    """Routes to the appropriate SmartRouter task_type based on eSocial event severity.
+    """Routes to the appropriate SmartRouter task_type based on LGPD safety flag.
 
     routing_decision values map to SmartRouterLLM(task_type=...) in generate_node:
-      - "deep_reasoning"  → 70b model, critical/high severity incidents
-      - "validation"      → 8b model, medium/low severity
-      - "sensitive_data"  → local Ollama (LGPD: PII detected)
+      - "deep_reasoning"  → heavy remote/local model, critical/high severity incidents
+      - "simple_search"   → lighter model, medium/low severity
+      - "sensitive_data"  → local Ollama (LGPD: PII detected and not safe for remote)
     """
     context = state.get("context")
 
     if context is None:
-        logger.warning("router_node: no context from parse — defaulting to deep_reasoning")
-        return {"routing_decision": "deep_reasoning", "model_used": None}
+        logger.warning("router_node: no context from parse — defaulting to sensitive_data")
+        return {"routing_decision": "sensitive_data", "model_used": None}
 
-    severity = _classify_severity(context.evento, context.codigo_erro)
-    pi_detected = bool(context.pi_detected)
+    is_safe = state.get("is_safe_for_remote", False)
+    severidade = state.get("severidade", "baixa")
 
-    # LGPD priority: PII in context → prefer local processing
-    if pi_detected:
+    # Fail-closed: se PII não seguro, força processamento local
+    if not is_safe:
         decision = "sensitive_data"
-    elif severity in ("CRITICAL", "HIGH"):
+    elif severidade in ("critica", "alta"):
         decision = "deep_reasoning"
     else:
-        decision = "validation"
+        decision = "simple_search"
 
     logger.info(
-        "router_node: evento=%s, erro=%s, severity=%s, pii=%s => routing_decision=%s",
-        context.evento, context.codigo_erro, severity, pi_detected, decision,
+        "router_node: evento=%s, erro=%s, severity=%s, is_safe=%s => routing_decision=%s",
+        context.evento, context.codigo_erro, severidade, is_safe, decision,
     )
 
     try:
@@ -69,8 +41,8 @@ async def smart_router_node(state: AgentState) -> Dict[str, Any]:
             "incident_id": state.get("incident_id"),
             "evento": context.evento,
             "codigo_erro": context.codigo_erro,
-            "severity": severity,
-            "pii_detected": pi_detected,
+            "severity": severidade,
+            "is_safe_for_remote": is_safe,
             "routing_decision": decision,
         })
     except Exception:

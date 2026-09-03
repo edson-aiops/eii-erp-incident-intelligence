@@ -9,6 +9,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **feat(deep-agents): SmartRouter com PIIScrubber obrigatório (A3)**
+  - `parse_node` integrado com `PIIScrubber`: scrubba XML, desempacota
+    `ScrubResult` e retorna `scrubbed_payload`, `is_safe_for_remote`,
+    `token_map` e `pii_scrubbed`.
+  - `router_node` passa a usar `is_safe_for_remote` em vez de `pi_detected`;
+    fail-closed força `sensitive_data` quando PII não é seguro.
+  - `generate_node` delega ao `SmartRouter.call()` e passa a flag
+    `is_safe_for_remote`.
+  - `finalize_node` restaura tokens com `scrber.restore()` antes de retornar
+    ao usuário; `token_map` nunca é serializado na saída.
+  - `retrieve_node` usa `scrubbed_payload` como fallback para query.
+  - `SmartRouter.call()` ganha parâmetro `is_safe_for_remote`; quando `False`,
+    vence qualquer `routing_decision` e força rota local.
+  - `AgentState` com 4 campos novos opcionais para suportar o fluxo LGPD.
+  - `tests/test_deep_agents_scrubber_integration.py`: 9 cenários verdes.
+  - Regressão: 109/109 testes passam.
+
 - **feat(privacy): PII Scrubber obrigatório v2 — revisão A23 da seção 3 da spec**
   - `src/privacy/scrubber.py` reescrito com allowlist dentro de blocos de titular
     (`trabalhador`, `dependente`, `endereco`, `contato`, `infoDeficiencia`, etc.).

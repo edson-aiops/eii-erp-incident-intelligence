@@ -71,6 +71,7 @@
 | `feature/claude-deep-agents-phase4` | Claude | Fase 4 Deep Agents (entregue, aguardando merge ou cleanup) | Pendente review | 2026-05-09 |
 | `feature/claude-fix-auth-fallback` | Claude | Fix auth fallback ctypes (entregue, provavelmente mergeado) | Pendente review | 2026-05-08 |
 | `feature/qwen-fix-smartrouter-export` | Qwen | Fix smartrouter export (entregue, provavelmente mergeado) | Pendente review | 2026-05-09 |
+| `feature/claude-smartrouter-scrubber` | Claude | A3 — SmartRouter com PIIScrubber obrigatório (implementado, aguardando review) | Em progresso | 2026-08-31 |
 
 ---
 
@@ -261,6 +262,7 @@ for k in ['GROQ_API_KEY','EII_ADMIN_USER','EII_ADMIN_PASS','QDRANT_API_KEY']:
 
 | Data | Decisao | Motivo |
 |---|---|---|
+| 2026-08-31 | **A3 — SmartRouter com PIIScrubber obrigatório** | Integra scrubber v2 no pipeline Deep Agents: parse_node scrubba PII, router_node usa `is_safe_for_remote`, generate_node passa flag ao SmartRouter, finalize_node restaura tokens, retrieve_node usa `scrubbed_payload`; 9 testes de integração + 109 testes totais verdes |
 | 2026-08-31 | **PII Scrubber v2 — revisão A23 da seção 3 da spec** | allowlist em blocos de titular, classes TOKENIZAR/CLASSIFICAR/GENERALIZAR, Id/nrInsc condicional a tpInsc, rede de segurança v2; 48 testes s2200 + 15 testes v1 + suíte completa 183 verdes |
 | 2026-05-19 | **Integrar Kimi K2.6 ao protocolo multi-agente** | 262K contexto para análise de estado, MCP nativo, open-weight, complementa Claude/Qwen |
 | 2026-05-08 | `_read_wincred()` via ctypes em vez de depender so do keyring | keyring nao le credenciais salvas via cmdkey (DOMAIN_PASSWORD tem blob vazio) |
@@ -273,6 +275,6 @@ for k in ['GROQ_API_KEY','EII_ADMIN_USER','EII_ADMIN_PASS','QDRANT_API_KEY']:
 
 ---
 
-**Ultima atualizacao:** 2026-08-31 (v3.1 — PII Scrubber v2 entregue na branch `feature/claude-mandatory-pii-scrubber`)
+**Ultima atualizacao:** 2026-08-31 (v3.1 — A3 SmartRouter+Scrubber implementado na branch `feature/claude-smartrouter-scrubber`, aguardando revisao de Edson)
 **Autor:** Edson Oliveira
 **Mantido por:** obrigatorio — qualquer mudanca no projeto atualiza este arquivo

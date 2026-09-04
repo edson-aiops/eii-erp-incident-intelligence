@@ -73,6 +73,10 @@
 | `feature/qwen-fix-smartrouter-export` | Qwen | Fix smartrouter export (entregue, provavelmente mergeado) | Pendente review | 2026-05-09 |
 | `feature/claude-smartrouter-scrubber` | Claude | A3 — SmartRouter com PIIScrubber obrigatório (implementado, aguardando review) | Em progresso | 2026-08-31 |
 
+
+| `feature/claude-eii-api-deep-agents` | Claude | A3.5 — eii_api.py ligado ao Deep Agents + scrubber obrigatório (implementado, aguardando review) | Em progresso | 2026-09-03 |
+
+
 ---
 
 ## Recentemente Concluído

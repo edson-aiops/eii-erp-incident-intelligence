@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v3.2] — 2026-09-04
+
+### Changed
+- Sincronizar README/PRD com stack real (A9)
+- Motor principal: GLM-5.3 (OpenRouter)
+- Fallback: Qwen 14B CPU (Ollama, Contabo)
+- Documentar: LGPD compliance (A23, A25, A26, A27)
+
+### Fixed
+- Contradição C2: Stack declarada vs real
+- Contradição C5: PII scrubbing status
+- Remover: Groq de documentação pública
+- Clarificar: Azure não deployado
+
+### Removed
+- Groq (obsoleto desde ago/26)
+
+---
+
 ## [Unreleased] — Fase 5.1
 
 ### Added

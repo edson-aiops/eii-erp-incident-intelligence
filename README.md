@@ -13,7 +13,7 @@ short_description: Diagnostico eSocial e EFD-Reinf com CRAG e HITL
 
 > Agentic AIOps para incidentes de compliance em HCM/ERP — diagnóstico de rejeições eSocial e EFD-Reinf com CRAG, Deep Agents e Human-in-the-Loop.
 
-[![Version](https://img.shields.io/badge/version-3.1-blue.svg)](https://github.com/edson-aiops/eii-erp-incident-intelligence)
+[![Version](https://img.shields.io/badge/version-3.2-blue.svg)](https://github.com/edson-aiops/eii-erp-incident-intelligence)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg)](https://www.python.org/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-≥0.2-1C3C3C.svg)](https://langchain-ai.github.io/langgraph/)
 [![Gradio](https://img.shields.io/badge/Gradio-≥5.0-FF6B6B.svg)](https://www.gradio.app/)
@@ -117,7 +117,7 @@ graph TD;
 | **Pipeline CRAG** | Retrieve → Grade → Generate → Evaluate → Reflexion, com confidence score baseado em logprobs e fallback quando nenhum documento da KB é relevante. |
 | **HITL Gate** | Todo diagnóstico é registrado como `PENDING` e exige aprovação/rejeição explícita do analista com notas. |
 | **Audit Trail** | Persistência SQLite com decisões imutáveis (`APPROVED` / `REJECTED` / `PENDING`) e hash de metadados. |
-| **SmartRouter Multi-LLM** | 9 provedores configurados — Groq, Anthropic, Mistral, Cerebras, Google AI, Ollama; Kimi/Qwen/DeepSeek roteados via Groq. |
+| **SmartRouter Multi-LLM** | Roteamento por tarefa — **GLM-5.3 via OpenRouter** (motor principal) e **Qwen 14B local via Ollama** (fallback LGPD), com provedores alternativos para resiliência. |
 | **MCP Server** | `mcp_server.py` expõe `eii_query(xml)` e `eii_escalate(incident_id, status, notes)` via fastmcp para qualquer cliente MCP. |
 | **REST API** | Serviço FastAPI (`api.py`) com 6 endpoints e autenticação `X-API-Key`. |
 | **LGPD by Design** | Scrubbing de CPF, CNPJ, NIS/PIS e nomes de trabalhadores **antes** de qualquer chamada ao LLM; inferência local opcional via Ollama. |
@@ -154,7 +154,7 @@ pip install -r requirements.txt
 **Opção A — Windows Credential Manager (recomendado para uso local):**
 
 ```powershell
-python -c "import keyring; keyring.set_password('EII_Project', 'GROQ_API_KEY', 'gsk_...')"
+python -c "import keyring; keyring.set_password('EII_Project', 'OPENROUTER_API_KEY', 'sk-or-...')"
 python -c "import keyring; keyring.set_password('EII_Project', 'EII_ADMIN_USER', 'your-username')"
 python -c "import keyring; keyring.set_password('EII_Project', 'EII_ADMIN_PASS', 'sua-senha-segura')"
 ```
@@ -202,7 +202,7 @@ O EII entrega dois entry points por design:
 | Versão | Arquivo | Público | Auth | Dados | Backend LLM |
 | --- | --- | --- | --- | --- | --- |
 | **Local** | `app.py` | Operação interna | Login SHA-256 + keyring | Dados reais permitidos | SmartRouter + Ollama |
-| **Pública** | `app_hf.py` | Recrutadores / demo | Nenhum | Sem dados reais | Apenas Groq cloud |
+| **Pública** | `app_hf.py` | Recrutadores / demo | Nenhum | Sem dados reais | Apenas LLM cloud (SmartRouter) |
 
 A versão pública é propositalmente minimalista e roda no HuggingFace Spaces. A versão local concentra autenticação, audit trail e inferência local LGPD-aware. **A demo pública nunca recebe dados de produção** — essa é uma arquitetura de privacidade deliberada, não uma limitação.
 
@@ -249,13 +249,23 @@ eii-erp-incident-intelligence/
 | Orquestração de agentes | LangGraph ≥0.2 | Workflow Deep Agents |
 | Retrieval | ChromaDB ≥0.6 (in-memory), Qdrant opcional | Base vetorial de conhecimento |
 | Embeddings | sentence-transformers 3.1.1 | `all-MiniLM-L6-v2` (384-dim) |
-| Roteamento LLM | SmartRouter | 9 provedores com fallback por tarefa |
+| Roteamento LLM | SmartRouter | GLM-5.3 (OpenRouter) como motor principal; Qwen 14B (Ollama) como fallback local LGPD |
+| Token map (PII) | Redis ≥4.5 (A25) | Mapa token→valor real com TTL de 7 dias, uso único, fallback em memória |
+| Audit de restaurações | PostgreSQL (A26) | `tokenmap_audit` — metadados apenas (nunca valores reais), rastreabilidade LGPD art. 12 |
 | REST API | FastAPI ≥0.111, uvicorn ≥0.29 | Integração ERP/HCM |
 | MCP | fastmcp ≥3.0 | Servidor Model Context Protocol |
 | Persistência | SQLite | Audit trail, decisões HITL, IntelAgent |
 | Observabilidade | LangSmith ≥0.1 | Tracing opcional |
 | Secrets | keyring ≥25.0 | Windows Credential Manager |
 | Container | Docker | Deploy reprodutível no HuggingFace Spaces |
+| Infraestrutura | Contabo VPS (Ubuntu 24.04, 8 vCPU, 24GB RAM) | Produção — custo previsível (~$13.44/mês); HuggingFace Spaces para a demo pública |
+
+### Stack descontinuado
+
+| Item | Status | Razão |
+| --- | --- | --- |
+| **Groq** | Descartado (ago/26) | Risco de decommissioning e custo opaco — substituído por GLM-5.3 (OpenRouter) |
+| **Azure (Container Apps)** | IaC especificado, **nunca deployado** | GitHub + HuggingFace permanecem primários; Contabo VPS escolhido para produção por controle e custo |
 
 ---
 
@@ -263,7 +273,25 @@ eii-erp-incident-intelligence/
 
 **Tracing LangSmith:** quando `LANGSMITH_API_KEY` está configurada, cada execução do pipeline gera um trace estruturado com metadata por nó (tipo de evento, código de erro, decisão de roteamento, confiança, referências KB). Quando não configurada, `observability.traceable` é um no-op sem overhead.
 
-**LGPD privacy by design:** `xml_parser.scrub_pii()` mascara CPF, CNPJ, NIS/PIS e nomes de trabalhadores antes de qualquer prompt ser construído ou persistido. Para payloads ultra-sensíveis, o analista pode habilitar inferência local via Ollama, mantendo os dados fora de APIs de terceiros.
+**LGPD privacy by design:** `PIIScrubber` (A23) **pseudonimiza** CPF, CNPJ, NIS/PIS, nomes e contatos — substituindo por tokens reversíveis — antes de qualquer chamada ao LLM. O mapa token→valor real fica no servidor (Redis com TTL de 7 dias, A25), toda restauração é auditada em PostgreSQL (A26) e a conformidade é verificada por análise periódica (A27). Para payloads não verificados, o *fail-closed* força execução local via Ollama — dados nunca saem com PII real.
+
+---
+
+## 🔐 PII Protection (LGPD Compliant)
+
+| Controle | Implementação | Evidência |
+| --- | --- | --- |
+| ✅ Pseudonimização reversível (valores reais nunca saem do servidor) | PIIScrubber v2 | A23 — 231 testes |
+| ✅ token_map com TTL de 7 dias, uso único, nunca serializado | Redis | A25 — 14 testes |
+| ✅ Audit log de restaurações (metadados apenas) | PostgreSQL `tokenmap_audit` | A26 — 10 testes |
+| ✅ Fail-closed (XML malformado / PII não verificada → local forçado) | `is_safe_for_remote` gate | A24 — 11 testes |
+| ✅ Análise periódica de TTL + relatório de conformidade | `scripts/a27_ttl_analysis.py` | A27 — 10 testes |
+
+Conformidade por artigo:
+- **Art. 5º, II** — dados sensíveis pseudonimizados (método reversível, não anonimização)
+- **Art. 12** — histórico de tratamento acessível (audit log imutável)
+- **Art. 18** — titular pode solicitar seus dados (query por incident_id)
+- **Art. 32** — segurança via TTL automático, fail-closed e trilha de auditoria
 
 ---
 
@@ -304,4 +332,4 @@ Projeto de portfólio aplicado a perfis de Business Systems / Information System
 
 ---
 
-**Última atualização:** julho/2026 · v3.1
+**Última atualização:** setembro/2026 · v3.2 — stack de produção (GLM-5.3 + Qwen 14B + Contabo) e LGPD compliance sincronizados com a realidade (A9)

@@ -1,9 +1,9 @@
 # PRD — EII: ERP Incident Intelligence
 
-**Versão:** 2.0
-**Status:** Phase 2 completa · Phase 3 planejada
+**Versão:** 2.1
+**Status:** Phase 2 completa · Fases 3–5 concluídas · stack de produção consolidada (A9)
 **Autor:** Edson · Senior IT Systems Analyst
-**Última atualização:** 2026-03-14
+**Última atualização:** 2026-09-04 (A9 — sincronização com stack real: GLM-5.3 + Qwen 14B + Contabo)
 
 ---
 
@@ -119,17 +119,64 @@ Um analista humano aprova ou rejeita o diagnóstico antes de qualquer ação ser
 | Persistence | `app.py` (`_db_*`) | SQLite: pending queue, decisão, audit log |
 | UI | `app.py` (Gradio) | 4 tabs: Diagnóstico, Aprovação, Audit Log, Arquitetura |
 
+### Motor de Diagnóstico
+
+**Principal: GLM-5.3 (OpenRouter)**
+- Modelo remoto de alta capacidade (contexto longo)
+- Latência alvo: < 5s p95 *(design target — medir em produção)*
+- Custo alvo: ~$0.002/diagnóstico *(design target)*
+- Qualidade alvo: ≥ 95% de acerto em eventos eSocial *(design target — benchmark planejado)*
+
+**Fallback: Qwen 14B (Ollama, Contabo VPS)**
+- Execução 100% local (CPU, 8 vCPU / 24GB RAM)
+- Latência: ~21s por diagnóstico
+- Ativado automaticamente quando `is_safe_for_remote=False` (gate LGPD) ou indisponibilidade do remoto
+- Garante que nenhum payload sensível seja enviado a terceiros
+
+### PII Protection
+
+Implementado em quatro camadas (todas testadas):
+
+1. **PIIScrubber v2 (A23)** — pseudonimização reversível: CPF, nome, e-mail,
+   telefone e demais PII viram tokens antes de qualquer chamada a LLM (231 testes)
+2. **Redis token_map (A25)** — mapa token→valor real fica no servidor, com TTL
+   de 7 dias e uso único (14 testes)
+3. **PostgreSQL audit (A26)** — toda restauração registrada com metadados
+   apenas, nunca valores reais (10 testes)
+4. **TTL Analysis (A27)** — análise periódica + relatório de conformidade (10 testes)
+
+Garantias:
+- ✅ Valores reais **NUNCA** saem do servidor
+- ✅ Tokens **NUNCA** são mapeados para valores no payload enviado
+- ✅ Falha no scrubber → fallback local (fail-closed)
+- ✅ Audit log registra todas as restaurações
+
+Conformidade LGPD:
+- **Art. 5º, II** — dados sensíveis pseudonimizados (reversível, não anonimização)
+- **Art. 12** — histórico de tratamento acessível (audit log imutável)
+- **Art. 18** — titular pode solicitar seus dados (query por `incident_id`)
+- **Art. 32** — segurança via Redis (TTL) + PostgreSQL (auditoria)
+
 ### Stack Técnica
 
 | Camada | Tecnologia | Justificativa |
 |---|---|---|
-| LLM Generator | Llama 3.3 70B (Groq) | Máxima qualidade para JSON estruturado |
-| LLM Router | Llama 3.1 8B (Groq) | Baixo custo para tarefas binárias (grade) |
+| LLM Principal | GLM-5.3 (OpenRouter) | Máxima qualidade para diagnóstico estruturado |
+| LLM Fallback | Qwen 14B (Ollama, Contabo) | Execução local LGPD-aware, sem custo marginal |
 | Vector Store | ChromaDB in-memory | Zero infra, suficiente para KB de 20–200 docs |
 | Embeddings | sentence-transformers all-MiniLM-L6-v2 | Open-source, baixa latência |
-| UI | Gradio 4.x | Deploy nativo em HuggingFace Spaces |
-| Persistence | SQLite | Zero dependências externas, portável |
-| Deploy | HuggingFace Spaces (Docker) | Free tier, git push → redeploy automático |
+| Token map (PII) | Redis (A25) | TTL automático, uso único, fallback memória |
+| Audit PII | PostgreSQL (A26) | Rastreabilidade LGPD art. 12, metadados apenas |
+| UI | Gradio ≥5 | Deploy local e demo pública |
+| Persistence | SQLite | Decisões HITL e audit trail de operação |
+| Deploy | Contabo VPS + HuggingFace Spaces | Produção controlada + demo pública |
+
+### Stack descontinuado
+
+| Item | Status | Razão |
+|---|---|---|
+| **Groq** | Descartado (ago/26) | Risco de decommissioning e custo opaco — substituído por GLM-5.3 (OpenRouter) |
+| **Azure (Container Apps)** | IaC especificado, **nunca deployado** | GitHub + HuggingFace primários; Contabo VPS escolhido para produção (ver ADR-004) |
 
 ---
 
@@ -160,7 +207,7 @@ O sistema deve usar o MODEL_GENERATOR para produzir um diagnóstico JSON com os 
 
 ### FR-06 — Score de Confiança Calibrado por Logprobs (ADR-001)
 O campo `confianca` do diagnóstico deve ser determinado por P(SIM) calculada via
-`top_logprobs` do Groq API — não pela auto-avaliação do LLM gerador.
+`top_logprobs` da API do LLM remoto — não pela auto-avaliação do LLM gerador.
 Thresholds: P ≥ 0.80 → ALTA | P ≥ 0.45 → MÉDIA | P < 0.45 → BAIXA.
 
 ### FR-07 — Fila de Aprovação Pendente
@@ -177,7 +224,7 @@ Todas as decisões devem ser armazenadas no SQLite com: `incident_id`, `created_
 O log deve ser ordenado por `decided_at DESC` e respeitar o limite configurável.
 
 ### FR-10 — Fallback Gracioso Sem API Key
-Se `GROQ_API_KEY` não estiver configurada, o sistema deve exibir mensagem clara ao
+Se `OPENROUTER_API_KEY` não estiver configurada, o sistema deve exibir mensagem clara ao
 usuário sem lançar exceção — nunca um traceback exposto na UI.
 
 ### FR-11 — Persistência Entre Reinicializações
@@ -276,7 +323,7 @@ os principais cenários de erro (retificação, certificado, vínculo, timeout).
 **Contexto:** LLMs tendem a ser excessivamente confiantes na auto-avaliação.
 O campo `confianca` gerado pelo `generate()` era pouco calibrado.
 
-**Decisão:** Usar `logprobs` do Groq API para medir P(token afirmativo) em uma pergunta
+**Decisão:** Usar `logprobs` da API remota (OpenRouter/GLM) para medir P(token afirmativo) em uma pergunta
 binária de confirmação do diagnóstico. O resultado substitui o campo `confianca` do LLM.
 
 **Consequências:** Confiança calibrada, auditável e testável. Custo adicional de 1 chamada

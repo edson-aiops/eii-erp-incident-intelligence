@@ -13,6 +13,7 @@ from src.deep_agents.nodes.retrieve_node import retrieve_node
 from src.deep_agents.nodes.generate_node import generate_node
 from src.deep_agents.nodes.finalize_node import finalize_node
 from src.deep_agents.state import AgentState, IncidentContext
+from src.utils.tokenmap_store import get_token_map_store
 
 
 S2200_COM_PII = """<eSocial>
@@ -77,7 +78,11 @@ async def test_parse_node_retorna_scrubbed_payload_e_seguranca():
 
     assert "scrubbed_payload" in result
     assert "is_safe_for_remote" in result
-    assert "token_map" in result
+    # A25: token_map não viaja no estado do grafo — vai para a store (Redis/TTL)
+    assert "token_map" not in result
+    store = get_token_map_store()
+    assert store.get("TEST-001"), "token_map deveria estar persistido na store"
+    store.delete("TEST-001")
     assert result["pii_scrubbed"] is True
     assert "11111111111" not in result["scrubbed_payload"]
     assert "MARIA APARECIDA" not in result["scrubbed_payload"]
@@ -187,8 +192,9 @@ async def test_smart_router_forca_local_quando_is_safe_false():
 
 @pytest.mark.asyncio
 async def test_finalize_node_restaura_tokens_na_resposta():
+    # A25: token_map vive na store (chave = incident_id), não no estado
+    get_token_map_store().set("TEST-001", {"NOME_001": "JOSE DA SILVA"})
     state = _base_state(
-        token_map={"NOME_001": "JOSE DA SILVA"},
         is_safe_for_remote=True,
         routing_decision="deep_reasoning",
         diagnosis={
@@ -201,6 +207,8 @@ async def test_finalize_node_restaura_tokens_na_resposta():
     diagnosis = result["final_result"]["diagnosis_raw"]
     assert "JOSE DA SILVA" in diagnosis["resposta"]
     assert "NOME_001" not in diagnosis["resposta"]
+    # uso único: mapa apagado da store após o restore
+    assert get_token_map_store().get("TEST-001") == {}
 
 
 @pytest.mark.asyncio

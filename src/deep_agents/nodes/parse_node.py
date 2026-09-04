@@ -5,6 +5,7 @@ from src.deep_agents.state import AgentState, IncidentContext
 # Reutiliza o parser ja testado em producao em vez de duplicar regex
 from xml_parser import parse_esocial_xml
 from src.privacy.scrubber import PIIScrubber
+from src.utils.tokenmap_store import get_token_map_store
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,14 @@ async def parse_xml_node(state: AgentState) -> Dict[str, Any]:
             is_safe = False
             token_map = {}
 
+        # A25: token_map sai do estado do grafo e vai para a store (Redis/TTL)
+        incident_id = state.get("incident_id", "")
+        if token_map and incident_id:
+            try:
+                get_token_map_store().set(incident_id, token_map)
+            except Exception as e:
+                logger.warning(f"parse_node: falha ao persistir token_map: {e}")
+
         pi_detected = []
         if parsed.nr_inscricao and "***" in parsed.nr_inscricao:
             pi_detected.append("CNPJ/CPF")
@@ -126,7 +135,7 @@ async def parse_xml_node(state: AgentState) -> Dict[str, Any]:
             "warnings": warnings,
             "scrubbed_payload": scrubbed_payload,
             "is_safe_for_remote": is_safe,
-            "token_map": token_map,
+            # A25: token_map NÃO viaja no estado — fica na store (Redis/TTL)
             "pii_scrubbed": True,
             "evento_id": evento_id,
             "tipo_evento": tipo_evento,
@@ -146,3 +155,7 @@ async def parse_xml_node(state: AgentState) -> Dict[str, Any]:
             "is_safe_for_remote": False,
             "pii_scrubbed": False,
         }
+
+
+# Alias de compatibilidade com o contrato A25 (testes referenciam parse_node)
+parse_node = parse_xml_node

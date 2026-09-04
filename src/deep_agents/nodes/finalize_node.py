@@ -2,6 +2,7 @@ import logging
 from typing import Dict, Any
 from src.deep_agents.state import AgentState
 from src.privacy.scrubber import PIIScrubber
+from src.utils.tokenmap_store import get_token_map_store
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,18 @@ async def finalize_node(state: AgentState) -> Dict[str, Any]:
     diagnosis = dict(state.get("diagnosis") or {})
     incident_id = state.get("incident_id", "UNKNOWN")
     iteration_count = state.get("iteration_count", 0)
-    token_map = state.get("token_map") or {}
+
+    # A25: token_map vem da store (Redis/TTL), não do estado do grafo.
+    # Lê e apaga imediatamente (uso único — restore só acontece no finalize).
+    token_map = {}
+    if incident_id and incident_id != "UNKNOWN":
+        try:
+            store = get_token_map_store()
+            token_map = store.get(incident_id)
+            if token_map:
+                store.delete(incident_id)
+        except Exception as e:
+            logger.warning("finalize_node: falha ao ler token_map da store: %s", e)
 
     # Restaurar tokens na resposta antes de expor ao usuário
     if token_map:

@@ -1,0 +1,14 @@
+{
+  "status": "not_executed",
+  "generated_at": "2026-09-04T13:19:19.744728",
+  "dataset_size": 20,
+  "reason": "Nenhum motor disponível neste ambiente (sem chave OpenRouter e/ou Ollama local). Regenerar em ambiente com os provedores configurados.",
+  "availability": {
+    "GLM-5.3 (OpenRouter)": false,
+    "Qwen 14B (Ollama local)": false
+  },
+  "targets": {
+    "glm": 5000,
+    "qwen": 21000
+  }
+}

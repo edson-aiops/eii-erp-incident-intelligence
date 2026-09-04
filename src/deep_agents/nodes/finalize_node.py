@@ -3,6 +3,7 @@ from typing import Dict, Any
 from src.deep_agents.state import AgentState
 from src.privacy.scrubber import PIIScrubber
 from src.utils.tokenmap_store import get_token_map_store
+from src.utils.audit_log_store import AuditLogStore
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,9 @@ async def finalize_node(state: AgentState) -> Dict[str, Any]:
     diagnosis = dict(state.get("diagnosis") or {})
     incident_id = state.get("incident_id", "UNKNOWN")
     iteration_count = state.get("iteration_count", 0)
+
+    # A26: audit log de reversões (PostgreSQL sync, fallback gracioso).
+    audit = AuditLogStore()
 
     # A25: token_map vem da store (Redis/TTL), não do estado do grafo.
     # Lê e apaga imediatamente (uso único — restore só acontece no finalize).
@@ -37,6 +41,27 @@ async def finalize_node(state: AgentState) -> Dict[str, Any]:
             diagnosis["resposta"] = scrubber.restore(resposta, token_map)
         except Exception as e:
             logger.warning("finalize_node: restore failed: %s", e)
+
+    # A26: registrar cada token restaurado — SOMENTE metadados
+    # (token_name + length), nunca o valor real (LGPD art. 12).
+    if token_map:
+        job_id = state.get("job_id")
+        for token_name, token_value in token_map.items():
+            try:
+                audit.log_restore(
+                    incident_id=incident_id,
+                    token_name=token_name,
+                    token_value_length=len(token_value),
+                    result="success",
+                    job_id=job_id,
+                    source="finalize_node",
+                )
+            except Exception as e:
+                logger.warning("finalize_node: audit log falhou para %s: %s", token_name, e)
+    try:
+        audit.close()
+    except Exception:
+        pass
 
     # ADR-001: override confianca with logprobs measurement
     logprob_sim = None

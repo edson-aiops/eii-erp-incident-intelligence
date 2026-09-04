@@ -35,6 +35,7 @@
 | `api.py` | Funcionando | REST API FastAPI para integracao ERP/HCM |
 | `src/` | Em desenvolvimento | estrutura modular futura |
 | `src/privacy/scrubber.py` | Funcionando | PII Scrubber obrigatório v2 — S-2200, Id condicional a tpInsc, rede de segurança v2 |
+| `src/utils/audit_log_store.py` | Funcionando | A26 — audit log de reversões token_map em PostgreSQL, fallback gracioso, metadados apenas (LGPD art. 12) |
 
 ### Agentes ativos no projeto
 
@@ -75,6 +76,7 @@
 
 
 | `feature/claude-eii-api-deep-agents` | Claude | A3.5 — eii_api.py ligado ao Deep Agents + scrubber obrigatório (implementado, aguardando review) | Em progresso | 2026-09-03 |
+| `feature/claude-audit-log` | Kimi (K2.7→K3) | A26 — AuditLogStore PostgreSQL para reversões de token_map (baseada em feature/claude-tokenmap-redis) | Em progresso | 2026-09-04 |
 
 
 ---
@@ -279,6 +281,6 @@ for k in ['GROQ_API_KEY','EII_ADMIN_USER','EII_ADMIN_PASS','QDRANT_API_KEY']:
 
 ---
 
-**Ultima atualizacao:** 2026-08-31 (v3.1 — A3 SmartRouter+Scrubber implementado na branch `feature/claude-smartrouter-scrubber`, aguardando revisao de Edson)
+**Ultima atualizacao:** 2026-09-04 (v3.1 — A26 AuditLogStore PostgreSQL na branch `feature/claude-audit-log`, baseada em `feature/claude-tokenmap-redis`, aguardando revisao de Edson)
 **Autor:** Edson Oliveira
 **Mantido por:** obrigatorio — qualquer mudanca no projeto atualiza este arquivo

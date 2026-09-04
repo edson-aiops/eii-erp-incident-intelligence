@@ -9,6 +9,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **feat(audit): registrar reversões de token_map em PostgreSQL (A26)**
+  - Novo `src/utils/audit_log_store.py`: `AuditLogStore` (psycopg2 sync) com
+    `log_restore`, `log_batch` (execute_values) e `query_by_incident`;
+    fallback gracioso — pipeline nunca quebra se PostgreSQL indisponível.
+  - Migration `migrations/001_create_tokenmap_audit.sql`: tabela
+    `tokenmap_audit` + índices (incident_id+timestamp, timestamp, result).
+  - `finalize_node` integrado: após restaurar tokens, registra 1 linha por
+    token — SOMENTE metadados (token_name + token_value_length), nunca o
+    valor real (LGPD art. 12, histórico de tratamento acessível).
+  - Nova dependência: `psycopg2-binary>=2.9.0`; config via `.env`
+    (`POSTGRES_HOST/PORT/DB/USER/PASSWORD`).
+  - `tests/test_audit_log.py`: 9 testes verdes (mocks) + 1 integração real
+    (skipa se PostgreSQL indisponível).
 
 
 - **feat(eii-api): eii_api.py como API v2 sobre Deep Agents (A3.5)**

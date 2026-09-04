@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<eSocial>
+  <evtAdmissao Id="ID1123456780001992026080112000000002">
+    <ideEvento><indRetif>1</indRetif><tpAmb>1</tpAmb></ideEvento>
+    <ideEmpregador><tpInsc>1</tpInsc><nrInsc>12345678000199</nrInsc></ideEmpregador>
+    <trabalhador>
+      <cpfTrab>11111111111</cpfTrab>
+      <nmTrab>MARIA DOS SANTOS</nmTrab>
+    </trabalhador>
+  </evtAdmissao>
+</eSocial>

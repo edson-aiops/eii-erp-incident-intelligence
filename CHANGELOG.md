@@ -9,6 +9,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **feat(eii-api): eii_api.py como API v2 sobre Deep Agents (A3.5)**
+  - Novo `eii_api.py`: FastAPI com `POST /api/analyze`, `POST /api/analyze-file`,
+    `GET /api/results/{job_id}` e `GET /api/health`; jobs em memória
+    (DB em produção — ver spec A3.5, seção 7).
+  - `run_analysis_deep_agents()`: scrubber obrigatório antes de qualquer
+    chamada ao grafo; `force_local=not is_safe_for_remote`;
+    tokens restaurados na resposta; `token_map` nunca serializado.
+  - Fail-closed duplo: exceção do scrubber **ou** fail-closed estrutural
+    (XML malformado / evento não mapeado — `token_map` vazio) retornam
+    `status="error"`, nunca tentam cloud.
+  - `api.py` (REST v1) não foi alterado; `glm_router.py` nunca existiu no repo.
+  - `tests/test_eii_api_deep_agents.py`: 12 cenários verdes (black-box).
+  - Regressão: suíte completa sem quebras.
+
 - **feat(deep-agents): SmartRouter com PIIScrubber obrigatório (A3)**
   - `parse_node` integrado com `PIIScrubber`: scrubba XML, desempacota
     `ScrubResult` e retorna `scrubbed_payload`, `is_safe_for_remote`,

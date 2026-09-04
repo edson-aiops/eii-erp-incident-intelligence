@@ -8,6 +8,40 @@
 
 ## Onde Estamos Agora
 
+## 🏁 Milestone v3.2 (2026-09-04)
+
+Sessão multi-ciclo A4→A9 concluída. Estado REAL (verificado em 2026-09-04):
+
+| Entrega | Branch | Status | Testes |
+|---|---|---|---|
+| A3/A3.5 — SmartRouter + Deep Agents + eii_api | main | ✅ Mergeado | 12 (eii_api) |
+| A23 — PIIScrubber v2 | main | ✅ Mergeado | 48 S-2200 + 15 v1 |
+| A24 — Testes de integração PII | main | ✅ Mergeado | 11 |
+| A25 — Redis token_map | main | ✅ Mergeado | 14 |
+| A26 — PostgreSQL audit | main | ✅ Mergeado | 10 |
+| A27 — TTL Analysis + relatório LGPD | main | ✅ Mergeado (bb132c2) | 10 |
+| A5 — Gradio UI | main | ✅ Mergeado (bd0f9ab) | validado manual (HTTP 200) |
+| A9 — Docs sync (README/PRD/ADR-004) | main | ✅ Mergeado (a0a12ab) | — |
+| A4 — Validação retrieval Qdrant | `feature/claude-qdrant-retrieval` | ⏳ Aguardando review | +10 (185 na branch) |
+| A6 — Aliases /analyze + /health | `feature/claude-api-pipeline` | ⏳ Aguardando review | +10 (185 na branch) |
+| A7/A8 — Benchmark + dataset | `feature/claude-benchmark` | ⏳ Aguardando review | +10 (195 na branch) |
+
+**Números reais:** 175 testes na main, zero quebras; regressão completa verificada
+em cada branch. Skips existentes: Redis/PostgreSQL indisponíveis no ambiente de dev.
+
+**Pendências honestas (não prometer além disso em entrevista/TCC):**
+- Benchmark real de latência: `benchmark_result.json` está `not_executed` — os
+  provedores (OpenRouter/Ollama) não estão no ambiente de dev. Rodar em produção.
+- Métricas do GLM-5.3 no PRD/README são **design targets** até baseline medido.
+- Deploy Contabo: app Gradio validado localmente (A5); deploy em produção é
+  passo do Edson (SSH + Nginx), ainda não executado nesta sessão.
+- PostgreSQL de produção (audit A26) precisa estar ativo para relatório A27 real.
+
+LGPD (implementado e testado): pseudonimização A23 + Redis TTL A25 +
+PostgreSQL audit A26 + análise A27 — art. 5º II, 12, 18, 32.
+
+---
+
 **Versao atual:** v3.1 (local) | v3.0 (HuggingFace publico)
 **Data de referencia:** 2026-08-31
 **Branch ativa:** `feature/claude-mandatory-pii-scrubber`
@@ -69,6 +103,9 @@
 
 | Branch | Agente | Tarefa | Status | Desde |
 |--------|--------|--------|--------|-------|
+| `feature/claude-qdrant-retrieval` | Kimi | A4 — validação retrieval Qdrant (10 testes) | Aguardando review | 2026-09-04 |
+| `feature/claude-api-pipeline` | Kimi | A6 — aliases /analyze + /health (10 testes) | Aguardando review | 2026-09-04 |
+| `feature/claude-benchmark` | Kimi | A7/A8 — benchmark + dataset (10 testes) | Aguardando review | 2026-09-04 |
 | `feature/claude-deep-agents-phase4` | Claude | Fase 4 Deep Agents (entregue, aguardando merge ou cleanup) | Pendente review | 2026-05-09 |
 | `feature/claude-fix-auth-fallback` | Claude | Fix auth fallback ctypes (entregue, provavelmente mergeado) | Pendente review | 2026-05-08 |
 | `feature/qwen-fix-smartrouter-export` | Qwen | Fix smartrouter export (entregue, provavelmente mergeado) | Pendente review | 2026-05-09 |
@@ -281,6 +318,6 @@ for k in ['GROQ_API_KEY','EII_ADMIN_USER','EII_ADMIN_PASS','QDRANT_API_KEY']:
 
 ---
 
-**Ultima atualizacao:** 2026-09-04 (v3.1 — A26 AuditLogStore PostgreSQL na branch `feature/claude-audit-log`, baseada em `feature/claude-tokenmap-redis`, aguardando revisao de Edson)
+**Ultima atualizacao:** 2026-09-04 (v3.2 — milestone A4→A9: 3 branches aguardando review do Edson, ver secao Milestone v3.2)
 **Autor:** Edson Oliveira
 **Mantido por:** obrigatorio — qualquer mudanca no projeto atualiza este arquivo

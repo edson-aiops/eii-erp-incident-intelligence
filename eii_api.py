@@ -144,6 +144,16 @@ async def health():
     return {"status": "ok", "engine": "deep_agents"}
 
 
+# ---------------------------------------------------------------------------
+# Aliases sem o prefixo /api (compatibilidade com clientes da spec A6)
+# ---------------------------------------------------------------------------
+
+@app.get("/health")
+async def health_alias():
+    """Alias de /api/health — expõe também a versão da API."""
+    return {"status": "ok", "engine": "deep_agents", "version": "3.2"}
+
+
 @app.post("/api/analyze", status_code=202)
 async def analyze(background_tasks: BackgroundTasks, body: DiagnoseRequest):
     """Analisa XML do eSocial via Deep Agents."""
@@ -206,3 +216,9 @@ async def get_result(job_id: str):
         if job_id not in jobs:
             raise HTTPException(status_code=404, detail="Job nao encontrado")
         return jobs[job_id]
+
+
+@app.post("/analyze", status_code=202)
+async def analyze_alias(background_tasks: BackgroundTasks, body: DiagnoseRequest):
+    """Alias de /api/analyze — mesmo contrato (202 + job_id + polling em /api/results)."""
+    return await analyze(background_tasks, body)

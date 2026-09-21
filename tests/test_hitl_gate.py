@@ -78,7 +78,7 @@ def test_fixture_ambigua_escala():
 def test_critico_escala_mesmo_com_confianca_alta():
     status, motivos = hitl_gate(dict(FIXTURE_CRITICA))
     assert status == "ESCALADO_HUMANO"
-    assert any("CRITICO" in m.upper() for m in motivos)
+    assert any("CRITICA" in m.upper() for m in motivos)
 
 
 def test_fallback_escala():

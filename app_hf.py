@@ -33,6 +33,85 @@ _KB_TOTAL   = len(_KB)
 _KB_ESOCIAL = sum(1 for i in _KB if not i.get("evento", "").startswith("R-"))
 _KB_REINF   = _KB_TOTAL - _KB_ESOCIAL
 
+# Conjunto de eventos conhecidos na KB (para detecção de evento_nao_mapeado)
+_KNOWN_EVENTOS: set[str] = set()
+if _KB:
+    for inc in _KB:
+        ev = inc.get("evento", "")
+        if ev:
+            _KNOWN_EVENTOS.add(ev)
+
+
+def hitl_gate(diagnostico: dict) -> tuple[str, list[str]]:
+    """
+    Portão HITL determinístico (pós-LLM, sem LLM/I/O).
+    Retorna (status, motivos).
+    """
+    # Fail-closed: se não for possível extrair campos obrigatórios
+    required = {"severidade", "confianca", "fonte", "evento_nao_mapeado"}
+    if not required.issubset(diagnostico.keys()):
+        return ("ESCALADO_HUMANO", ["PARSE_FALHOU"])
+
+    severidade = diagnostico.get("severidade", "").upper()
+    confianca = diagnostico.get("confianca", 0.0)
+    fonte = diagnostico.get("fonte", "")
+    evento_nao_mapeado = diagnostico.get("evento_nao_mapeado", False)
+
+    motivos: list[str] = []
+
+    # Regra 1: severidade CRITICO
+    if severidade == "CRITICO":
+        motivos.append("SEVERIDADE_CRITICA")
+
+    # Regra 2: confianca < 0.70
+    if confianca < 0.70:
+        motivos.append("CONFIANCA_BAIXA")
+
+    # Regra 3: fonte == LLM_FALLBACK
+    if fonte == "LLM_FALLBACK":
+        motivos.append("LLM_FALLBACK")
+
+    # Regra 4: evento_nao_mapeado
+    if evento_nao_mapeado:
+        motivos.append("EVENTO_NAO_MAPEADO")
+
+    if motivos:
+        return ("ESCALADO_HUMANO", motivos)
+    else:
+        return ("AUTO_RESOLVIDO", [])
+
+
+def _parse_diagnostico(text: str) -> dict:
+    """
+    Extrai campos estruturados do markdown gerado pelo LLM.
+    Retorna dict com chaves: evento, severidade, confianca.
+    Se não conseguir extrair, retorna dict vazio (fail-closed).
+    """
+    result: dict = {}
+    # Extrair evento
+    m = re.search(r'\*\*Evento:\*\*\s*(.+)', text)
+    if m:
+        result["evento"] = m.group(1).strip()
+    # Extrair severidade
+    m = re.search(r'\*\*Severidade:\*\*\s*(.+)', text, re.IGNORECASE)
+    if m:
+        raw = m.group(1).strip().lower()
+        # mapear para valores padrao
+        if raw in ("critico", "alto", "medio", "baixo"):
+            result["severidade"] = raw.upper()
+        else:
+            result["severidade"] = raw.upper()
+    # Extrair confianca textual e converter para float
+    m = re.search(r'\*\*Confianca:\*\*\s*(.+)', text, re.IGNORECASE)
+    if m:
+        raw = m.group(1).strip().lower()
+        # mapear "alta" -> 0.95, "media" -> 0.60, "baixa" -> 0.30
+        mapping = {"alta": 0.95, "media": 0.60, "baixa": 0.30}
+        result["confianca"] = mapping.get(raw, 0.5)
+    else:
+        result["confianca"] = 0.0
+    return result
+
 
 def _kb_lookup(xml: str, top_n: int = 2) -> list[dict]:
     if not _KB:
@@ -187,7 +266,29 @@ def diagnose_public(xml_raw: str, mentor_mode: bool) -> str:
     scrub_info = f"PII removido: {pii_count} ocorrencia(s)" if pii_count else "Nenhum dado pessoal detectado"
 
     diag, engine = _call_groq(xml_clean, inc_id, mentor_mode)
-    return f"{diag}\n\n---\n`{inc_id}` | {scrub_info} | {engine}"
+
+    # --- HITL Gate ---
+    parsed = _parse_diagnostico(diag)
+    # Determinar fonte e evento_nao_mapeado
+    kb_refs = len(_kb_lookup(xml_clean))
+    fonte = "KB" if kb_refs > 0 else "LLM_FALLBACK"
+    evento_nao_mapeado = False
+    if parsed.get("evento"):
+        evento_nao_mapeado = parsed["evento"] not in _KNOWN_EVENTOS
+    diagnostico = {
+        "severidade": parsed.get("severidade", ""),
+        "confianca": parsed.get("confianca", 0.0),
+        "fonte": fonte,
+        "evento_nao_mapeado": evento_nao_mapeado,
+    }
+    status, motivos = hitl_gate(diagnostico)
+
+    if status == "ESCALADO_HUMANO":
+        hitl_line = f"\n\n---\n### 🟠 Escalado para analista humano\n**Motivo(s):** {', '.join(motivos)}"
+    else:
+        hitl_line = "\n\n---\n### 🟢 Auto-resolvido"
+
+    return f"{diag}\n\n---\n`{inc_id}` | {scrub_info} | {engine}{hitl_line}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

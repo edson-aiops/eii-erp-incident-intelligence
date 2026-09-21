@@ -5,7 +5,7 @@
 
 ## 🔥 Item mais urgente
 
-**HITL real no `app_hf.py`** — o Space público anuncia HITL que não implementa
+✅ **HITL real no `app_hf.py`** — CONCLUÍDO em 2026-09-22 (commit 33690e3, ver EVIDENCE_PACK.md) — o Space público anuncia HITL que não implementa
 (LLM diz "confiança Alta" até em fixture ambígua). Decisão pendente:
 **A)** implementar portão real ou **B)** remover a alegação até existir.
 Heurística "múltiplas ocorrências = HITL" já foi rejeitada como maquiagem.
